@@ -14,6 +14,7 @@ PACKAGES=(
     eza
     bat
     btop
+    nano
 
     # Apps
     ghostty
