@@ -1,8 +1,8 @@
 #!/bin/bash
-echo "📝 [7/9] Installing Fastfetch Config..."
+echo "📝 [7/10] Installing Fastfetch Config..."
 
 mkdir -p "$HOME/.config/fastfetch"
-cat > "$HOME/.config/fastfetch/config.jsonc" << 'EOF'
+cat >"$HOME/.config/fastfetch/config.jsonc" <<'EOF'
 {
     "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
     "logo": {

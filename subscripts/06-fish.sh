@@ -1,9 +1,9 @@
 #!/bin/bash
-echo "🐠 [6/9] Configuring Fish Shell..."
+echo "🐠 [6/10] Configuring Fish Shell..."
 
 mkdir -p "$HOME/.config/fish"
 
-cat > "$HOME/.config/fish/config.fish" << 'EOF'
+cat >"$HOME/.config/fish/config.fish" <<'EOF'
 # ===============================================
 # 🌊 Zypher Systems - Enhanced Fish Configuration
 # ===============================================
@@ -176,3 +176,4 @@ if status is-interactive
     end
 end
 EOF
+

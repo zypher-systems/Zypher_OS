@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "📦 [2/9] Installing Core Packages..."
+echo "📦 [2/10] Installing Core Packages..."
 
 PACKAGES=(
   # Core Tools
@@ -19,6 +19,8 @@ PACKAGES=(
   fd
   unzip
   wget
+  xclip
+  wl-clipboard
 
   # Apps
   ghostty

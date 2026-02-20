@@ -6,8 +6,8 @@ NVIM_CONFIG_DIR="$HOME/.config/nvim"
 MY_NVIM_REPO="https://github.com/zypher-systems/nvim-config.git"
 
 # --- 1. Install Dependencies ---
-echo "   Installing Neovim dependencies (ripgrep, fd, lazygit)..."
-sudo pacman -S --noconfirm --needed neovim ripgrep fd lazygit unzip wget base-devel
+echo "   Installing Neovim dependencies (ripgrep, fd, lazygit, clipboard)..."
+sudo pacman -S --noconfirm --needed neovim ripgrep fd lazygit unzip wget base-devel xclip wl-clipboard
 
 # --- 2. Setup Config ---
 if [ -d "$NVIM_CONFIG_DIR" ]; then

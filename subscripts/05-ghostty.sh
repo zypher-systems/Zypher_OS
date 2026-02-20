@@ -1,12 +1,12 @@
 #!/bin/bash
-echo "🎨 [5/9] Configuring Ghostty..."
+echo "🎨 [5/10] Configuring Ghostty..."
 
 mkdir -p "$HOME/.config/ghostty/themes"
 GHOSTTY_CONFIG="$HOME/.config/ghostty/config"
 CARBONFOX_THEME="$HOME/.config/ghostty/themes/carbonfox"
 
 # Create Carbonfox Theme
-cat > "$CARBONFOX_THEME" << 'EOF'
+cat >"$CARBONFOX_THEME" <<'EOF'
 palette = 0=#282828
 palette = 1=#ee5396
 palette = 2=#25be6a
@@ -32,7 +32,7 @@ EOF
 
 # Write Ghostty Config
 if ! grep -q "shell-integration = fish" "$GHOSTTY_CONFIG" 2>/dev/null; then
-    cat >> "$GHOSTTY_CONFIG" << EOF
+  cat >>"$GHOSTTY_CONFIG" <<EOF
 command = /usr/bin/fish
 font-family = MesloLGS Nerd Font Mono
 font-family-bold = MesloLGS Nerd Font Mono Bold
@@ -43,3 +43,4 @@ theme = carbonfox
 shell-integration = fish
 EOF
 fi
+

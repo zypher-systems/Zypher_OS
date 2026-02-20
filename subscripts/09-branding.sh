@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "🎨 [9/9] Applying ZypherOS Branding..."
+echo "🎨 [9/10] Applying ZypherOS Branding..."
 
 # --- Variables ---
 SOURCE_DIR="../images"
@@ -63,4 +63,3 @@ else
 fi
 
 echo "✅ Branding Applied."
-
