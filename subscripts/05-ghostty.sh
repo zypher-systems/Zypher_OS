@@ -44,3 +44,20 @@ shell-integration = fish
 EOF
 fi
 
+# Set Ghostty as Default Terminal
+echo "   Setting Ghostty as the default terminal..."
+
+# 1. System-wide default (Requires sudo since it touches /etc)
+if ! grep -q "TERMINAL=ghostty" /etc/environment 2>/dev/null; then
+  echo "TERMINAL=ghostty" | sudo tee -a /etc/environment >/dev/null
+fi
+
+# 2. KDE Plasma default (Using the user's $HOME directory)
+KDE_GLOBALS="$HOME/.config/kdeglobals"
+if ! grep -q "TerminalApplication=ghostty" "$KDE_GLOBALS" 2>/dev/null; then
+  cat >>"$KDE_GLOBALS" <<EOF
+
+[General]
+TerminalApplication=ghostty
+EOF
+fi
