@@ -2,34 +2,39 @@
 echo "📦 [2/9] Installing Core Packages..."
 
 PACKAGES=(
-    # Core Tools
-    base-devel
-    git
-    fastfetch
-    fish
-    neovim
-    starship
-    zoxide
-    thefuck
-    eza
-    bat
-    btop
+  # Core Tools
+  base-devel
+  git
+  fastfetch
+  fish
+  neovim
+  starship
+  zoxide
+  thefuck
+  eza
+  bat
+  btop
+  lazygit
+  ripgrep
+  fd
+  unzip
+  wget
 
-    # Apps
-    ghostty
-    gwenview
-    okular
-    gimp
-    blender
-    inkscape
-    libreoffice-fresh
-    pika-backup
-    obs-studio
-    flatpak
+  # Apps
+  ghostty
+  gwenview
+  okular
+  gimp
+  blender
+  inkscape
+  libreoffice-fresh
+  pika-backup
+  obs-studio
+  flatpak
 
-    # Fonts
-    ttf-meslo-nerd
-    noto-fonts
+  # Fonts
+  ttf-meslo-nerd
+  noto-fonts
 )
 
 sudo pacman -S --noconfirm --needed "${PACKAGES[@]}"
