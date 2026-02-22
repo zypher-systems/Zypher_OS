@@ -33,6 +33,7 @@ PACKAGES=(
   pika-backup
   obs-studio
   flatpak
+  kdenlive
 
   # Fonts
   ttf-meslo-nerd
