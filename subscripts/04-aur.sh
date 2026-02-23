@@ -10,4 +10,4 @@ if ! command -v yay &>/dev/null; then
 fi
 
 echo "   Installing AUR Packages..."
-yay -S --noconfirm visual-studio-code-bin limine-snapper-sync-git
+yay -S --noconfirm visual-studio-code-bin
