@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "🐠 [6/10] Configuring Fish Shell..."
+echo "🐠 [6/11] Configuring Fish Shell..."
 
 mkdir -p "$HOME/.config/fish"
 
@@ -176,4 +176,3 @@ if status is-interactive
     end
 end
 EOF
-

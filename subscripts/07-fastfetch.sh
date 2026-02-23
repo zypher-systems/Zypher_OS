@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "📝 [7/10] Installing Fastfetch Config..."
+echo "📝 [7/11] Installing Fastfetch Config..."
 
 mkdir -p "$HOME/.config/fastfetch"
 cat >"$HOME/.config/fastfetch/config.jsonc" <<'EOF'

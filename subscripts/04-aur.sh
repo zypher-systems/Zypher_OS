@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "📦 [4/10] Configuring AUR..."
+echo "📦 [4/11] Configuring AUR..."
 
 # Install yay if missing
 if ! command -v yay &>/dev/null; then

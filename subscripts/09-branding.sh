@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "🎨 [9/10] Applying ZypherOS Branding..."
+echo "🎨 [9/11] Applying ZypherOS Branding..."
 
 # --- Variables ---
 SOURCE_DIR="../images"

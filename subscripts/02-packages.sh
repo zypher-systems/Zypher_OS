@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "📦 [2/10] Installing Core Packages..."
+echo "📦 [2/11] Installing Core Packages..."
 
 PACKAGES=(
   # Core Tools

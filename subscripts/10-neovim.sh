@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "📝 [10/10] Configuring Neovim & LazyVim..."
+echo "📝 [10/11] Configuring Neovim & LazyVim..."
 
 NVIM_CONFIG_DIR="$HOME/.config/nvim"
 # Replace this with your actual GitHub repo URL!

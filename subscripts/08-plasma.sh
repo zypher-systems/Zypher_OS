@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "⚙️  [8/10] Configuring KDE Plasma Settings..."
+echo "⚙️  [8/11] Configuring KDE Plasma Settings..."
 
 # --- 1. Enable NumLock on Login Screen (SDDM) ---
 # This requires sudo because SDDM runs as a system user
