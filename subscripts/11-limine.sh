@@ -3,9 +3,9 @@ echo "[11/11] Configuring Limine Bootloader for ZypherOS..."
 
 CONF_PATH="/boot/limine/limine.conf"
 
-# 1. Safely rename the OS using a temporary file
+# 1. Safely replace all instances of "Arch Linux" with "ZypherOS"
 echo "Rebranding boot menu..."
-sed 's/^:Arch Linux/:ZypherOS/' "$CONF_PATH" >/tmp/limine_temp.conf
+sed 's/Arch Linux/ZypherOS/g' "$CONF_PATH" >/tmp/limine_temp.conf
 cat /tmp/limine_temp.conf | sudo tee "$CONF_PATH" >/dev/null
 rm /tmp/limine_temp.conf
 echo "Boot menu successfully branded as ZypherOS."
