@@ -9,5 +9,4 @@ if ! command -v yay &>/dev/null; then
   cd ~ && rm -rf /tmp/yay
 fi
 
-echo "   Installing AUR Packages..."
-yay -S --noconfirm visual-studio-code-bin
+echo "   AUR is now available and ready to use..."
