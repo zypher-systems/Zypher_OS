@@ -1,38 +1,30 @@
 #!/bin/bash
 echo "Configuring Limine Bootloader for ZypherOS..."
 
-# 1. Dynamically find the Limine config file
-if [ -f /boot/limine.conf ]; then
-  CONF_PATH="/boot/limine.conf"
-elif [ -f /boot/limine/limine.conf ]; then
-  CONF_PATH="/boot/limine/limine.conf"
-elif [ -f /efi/limine.conf ]; then
-  CONF_PATH="/efi/limine.conf"
-else
-  echo "Error: Could not find limine.conf."
-  exit 1
-fi
+CONF_PATH="/boot/limine/limine.conf"
 
-# 2. Rename the main OS entry to "ZypherOS"
-sudo sed -i '0,/^:[a-zA-Z0-9 _-]*/s//:ZypherOS/' "$CONF_PATH"
+# 1. Safely rename the main OS entry to "ZypherOS"
+# This reads the file, changes the first line starting with a colon, and securely overwrites it
+sed '0,/^:.*/s/^:.*/:ZypherOS/' "$CONF_PATH" | sudo tee "$CONF_PATH" >/dev/null
 echo "Boot menu successfully branded as ZypherOS."
 
-# 3. Inject the Snapper menu into the main Limine config
-if ! grep -q "limine-snapper.conf" "$CONF_PATH"; then
-  echo "" | sudo tee -a "$CONF_PATH"
-  echo "# Include BTRFS Snapshots Menu" | sudo tee -a "$CONF_PATH"
-  echo "remember: yes" | sudo tee -a "$CONF_PATH"
-  echo "include: boot():/limine-snapper.conf" | sudo tee -a "$CONF_PATH"
+# 2. Inject the Snapper menu into the main Limine config
+if ! grep -q "remember: yes" "$CONF_PATH"; then
+  echo "" | sudo tee -a "$CONF_PATH" >/dev/null
+  echo "# Include BTRFS Snapshots Menu" | sudo tee -a "$CONF_PATH" >/dev/null
+  echo "remember: yes" | sudo tee -a "$CONF_PATH" >/dev/null
+
+  # limine-snapper-sync usually generates limine-snapshots.conf
+  echo "include: boot():/limine/limine-snapshots.conf" | sudo tee -a "$CONF_PATH" >/dev/null
   echo "Snapper snapshot menu linked to Limine."
 fi
 
-# 4. Generate the first snapshot menu
-# This check ensures the script doesn't error out if the AUR script hasn't run yet
-if command -v limine-snapper &>/dev/null; then
-  sudo limine-snapper
+# 3. Generate the first snapshot menu manually to ensure the file exists
+if command -v limine-snapper-sync &>/dev/null; then
+  sudo limine-snapper-sync
   echo "Limine configuration complete!"
 else
-  echo "Warning: limine-snapper not found. Make sure your AUR script ran successfully."
+  echo "Warning: limine-snapper-sync command not found."
 fi
 
 fastfetch
