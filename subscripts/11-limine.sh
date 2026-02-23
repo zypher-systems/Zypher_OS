@@ -22,7 +22,7 @@ fi
 # Tell limine-snapper-sync where the boot partition is mounted
 echo "Setting ESP_PATH for limine-snapper-sync..."
 sudo mkdir -p /etc/default
-echo 'ESP_PATH="/boot"' | sudo tee /etc/default/limine >/dev/null
+echo 'ESP_PATH="/boot/limine"' | sudo tee /etc/default/limine >/dev/null
 
 # 3. Generate the first snapshot menu manually to ensure the file exists
 if command -v limine-snapper-sync &>/dev/null; then
