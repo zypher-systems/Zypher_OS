@@ -24,8 +24,8 @@ echo "   ✅ NumLock Configured."
 
 # ----------TEST CODE----------
 
-# --- 3. Apply the Breeze Dark global theme to the current user
-plasma-apply-lookandfeel -a org.kde.breezedark.desktop
+# --- 3. Apply the Breeze Dark global theme to the current user (Headless Mode)
+QT_QPA_PLATFORM=offscreen plasma-apply-lookandfeel -a org.kde.breezedark.desktop
 
 # --- 4. Tell SDDM to use the standard Breeze theme
 sudo mkdir -p /etc/sddm.conf.d
