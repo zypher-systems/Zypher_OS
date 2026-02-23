@@ -34,6 +34,7 @@ PACKAGES=(
   obs-studio
   flatpak
   kdenlive
+  thunderbird
 
   # Fonts
   ttf-meslo-nerd
