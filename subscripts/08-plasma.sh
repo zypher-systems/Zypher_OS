@@ -22,8 +22,6 @@ kwriteconfig6 --file kcminputrc --group Keyboard --key NumLock 0
 
 echo "   ✅ NumLock Configured."
 
-# ----------TEST CODE----------
-
 # --- 3. Apply the Breeze Dark global theme to the current user (Headless Mode)
 QT_QPA_PLATFORM=offscreen plasma-apply-lookandfeel -a org.kde.breezedark.desktop
 
@@ -37,5 +35,3 @@ sudo cp ~/.config/kdeglobals /var/lib/sddm/.config/kdeglobals
 
 # Fix the file permissions so the SDDM user can actually read it
 sudo chown -R sddm:sddm /var/lib/sddm/.config
-
-# ----------END TEST CODE----------
