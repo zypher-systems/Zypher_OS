@@ -29,4 +29,3 @@ echo "   Bootstrapping plugins in the background..."
 nvim --headless "+Lazy! sync" +qa >/dev/null 2>&1
 
 echo "✅ Neovim setup complete."
-fastfetch

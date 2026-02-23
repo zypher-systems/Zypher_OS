@@ -44,10 +44,10 @@ chmod +x *.sh
 ./08-plasma.sh
 ./09-branding.sh
 ./10-neovim.sh
+./11-limine.sh
 
 # --- Cleanup ---
 echo "🧹 Cleaning up temporary files..."
 rm -rf "$TEMP_DIR"
 
 echo "✅ ZypherOS Installation Complete! Please reboot."
-
