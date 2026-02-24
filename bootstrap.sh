@@ -142,7 +142,7 @@ cp /usr/share/limine/limine-bios.sys /boot/
 # Write the custom Limine Config securely
 echo "timeout: 5" > /boot/limine.conf
 echo "" >> /boot/limine.conf
-echo ":ZypherOS" >> /boot/limine.conf
+echo "/ZypherOS" >> /boot/limine.conf
 echo "    protocol: linux" >> /boot/limine.conf
 echo "    kernel_path: boot():/vmlinuz-linux" >> /boot/limine.conf
 echo "    module_path: boot():/initramfs-linux.img" >> /boot/limine.conf
