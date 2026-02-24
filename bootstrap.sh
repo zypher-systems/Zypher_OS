@@ -11,23 +11,58 @@ if [ ! -d "/sys/firmware/efi" ]; then
 else
     echo "Notice: Booted in UEFI mode. Proceeding with standard EFI install."
 fi
+echo ""
 
 # --- 1. The Interview ---
 echo "Available Drives:"
-lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop"
+# Read all valid drives into an array, ignoring loopbacks and cdroms
+mapfile -t DRIVE_ARRAY < <(lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop" | grep -v "rom")
+
+# Print the numbered list dynamically
+for i in "${!DRIVE_ARRAY[@]}"; do
+    echo "  $((i+1))) ${DRIVE_ARRAY[$i]}"
+done
 echo ""
-read -p "Enter target drive (e.g., /dev/sda or /dev/nvme0n1): " TARGET_DRIVE < /dev/tty
+
+# Trap the user until they enter a valid number
+while true; do
+    read -p "Select the number of the target drive (1-${#DRIVE_ARRAY[@]}): " DRIVE_NUM < /dev/tty
+    if [[ "$DRIVE_NUM" =~ ^[0-9]+$ ]] && [ "$DRIVE_NUM" -ge 1 ] && [ "$DRIVE_NUM" -le "${#DRIVE_ARRAY[@]}" ]; then
+        # Extract just the device path (e.g., /dev/sda) from the selection
+        TARGET_DRIVE=$(echo "${DRIVE_ARRAY[$((DRIVE_NUM-1))]}" | awk '{print $1}')
+        echo "Selected target: $TARGET_DRIVE"
+        break
+    else
+        echo "Invalid selection. Please pick a number from the list."
+    fi
+done
+
+echo ""
 read -p "Enter desired username: " USERNAME < /dev/tty
-read -sp "Enter password for $USERNAME (and Root): " PASSWORD < /dev/tty
+
+# Trap the user until passwords match
+while true; do
+    read -sp "Enter password for $USERNAME (and Root): " PASSWORD < /dev/tty
+    echo ""
+    read -sp "Confirm password: " PASSWORD_CONFIRM < /dev/tty
+    echo ""
+    if [ "$PASSWORD" == "$PASSWORD_CONFIRM" ]; then
+        echo "Passwords match."
+        break
+    else
+        echo "Error: Passwords do not match. Please try again."
+    fi
+done
+
 echo ""
 read -p "Enter system hostname: " HOSTNAME < /dev/tty
 
 echo ""
 echo "Select Video Driver:"
-echo "1) AMD (Open Source)"
-echo "2) NVIDIA (Proprietary)"
-echo "3) Intel"
-echo "4) Virtual Machine (QEMU/VMware)"
+echo "  1) AMD (Open Source)"
+echo "  2) NVIDIA (Proprietary)"
+echo "  3) Intel"
+echo "  4) Virtual Machine (QEMU/VMware)"
 read -p "Selection (1-4): " GPU_CHOICE < /dev/tty
 
 case $GPU_CHOICE in
@@ -57,7 +92,7 @@ sgdisk -n 2:0:+1024M -t 2:ef00 -c 2:"EFI" "$TARGET_DRIVE"
 # Part 3: Remaining space for BTRFS Root
 sgdisk -n 3:0:0 -t 3:8300 -c 3:"ROOT" "$TARGET_DRIVE"
 
-if [[ "$TARGET_DRIVE" == *"nvme"* ]]; then
+if [[ "$TARGET_DRIVE" == *"nvme"* ]] || [[ "$TARGET_DRIVE" == *"mmcblk"* ]]; then
     EFI_PART="${TARGET_DRIVE}p2"
     ROOT_PART="${TARGET_DRIVE}p3"
 else
@@ -95,7 +130,7 @@ echo "Updating Arch Keyring to prevent package installation failures..."
 pacman -Sy archlinux-keyring --noconfirm
 
 echo "Installing base system and ZypherOS dependencies..."
-pacstrap -K /mnt base base-devel linux linux-firmware btrfs-progs sudo networkmanager neovim git plasma sddm limine snapper efibootmgr mtools konsole dolphin ark spectacle pipewire kate wireplumber pipewire-pulse bluez bluez-utils bluedevil noto-fonts noto-fonts-emoji $GPU_PKG
+pacstrap -K /mnt base base-devel linux linux-firmware btrfs-progs sudo networkmanager neovim git plasma sddm limine snapper efibootmgr mtools konsole dolphin ark spectacle kate pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil noto-fonts noto-fonts-emoji $GPU_PKG
 
 echo "Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -127,7 +162,7 @@ systemctl enable NetworkManager
 systemctl enable sddm
 systemctl enable bluetooth
 
-# Initialize Snapper (Nested matching your layout)
+# Initialize Snapper
 snapper -c root create-config /
 snapper -c home create-config /home
 chmod 750 /.snapshots
