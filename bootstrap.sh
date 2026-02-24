@@ -9,11 +9,11 @@ echo "========================================="
 echo "Available Drives:"
 lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop"
 echo ""
-read -p "Enter target drive (e.g., /dev/sda or /dev/nvme0n1): " TARGET_DRIVE
-read -p "Enter desired username: " USERNAME
-read -sp "Enter password for $USERNAME (and Root): " PASSWORD
+read -p "Enter target drive (e.g., /dev/sda or /dev/nvme0n1): " TARGET_DRIVE < /dev/tty
+read -p "Enter desired username: " USERNAME < /dev/tty
+read -sp "Enter password for $USERNAME (and Root): " PASSWORD < /dev/tty
 echo ""
-read -p "Enter system hostname: " HOSTNAME
+read -p "Enter system hostname: " HOSTNAME < /dev/tty
 
 echo ""
 echo "Select Video Driver:"
@@ -21,7 +21,7 @@ echo "1) AMD (Open Source)"
 echo "2) NVIDIA (Proprietary)"
 echo "3) Intel"
 echo "4) Virtual Machine (QEMU/VMware)"
-read -p "Selection (1-4): " GPU_CHOICE
+read -p "Selection (1-4): " GPU_CHOICE < /dev/tty
 
 case $GPU_CHOICE in
     1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon" ;;
@@ -33,7 +33,7 @@ esac
 
 echo ""
 echo "WARNING: This will COMPLETELY WIPE $TARGET_DRIVE."
-read -p "Are you sure you want to continue? (Type YES to proceed): " CONFIRM
+read -p "Are you sure you want to continue? (Type YES to proceed): " CONFIRM < /dev/tty
 if [ "$CONFIRM" != "YES" ]; then
     echo "Aborting installation."
     exit 1
