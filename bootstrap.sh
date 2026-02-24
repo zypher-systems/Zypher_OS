@@ -39,18 +39,23 @@ if [ "$CONFIRM" != "YES" ]; then
     exit 1
 fi
 
-# --- 2. Partitioning ---
+# --- 2. Universal Partitioning (Supports UEFI & SeaBIOS) ---
 echo "Wiping and partitioning $TARGET_DRIVE..."
 sgdisk -Z "$TARGET_DRIVE"
-sgdisk -n 1:0:+1024M -t 1:ef00 -c 1:"EFI" "$TARGET_DRIVE"
-sgdisk -n 2:0:0 -t 2:8300 -c 2:"ROOT" "$TARGET_DRIVE"
+
+# Part 1: 1MB BIOS Boot Partition (Required for Limine on Legacy BIOS with GPT)
+sgdisk -n 1:0:+1M -t 1:ef02 -c 1:"BIOS_BOOT" "$TARGET_DRIVE"
+# Part 2: 1GB EFI System Partition (Required for UEFI)
+sgdisk -n 2:0:+1024M -t 2:ef00 -c 2:"EFI" "$TARGET_DRIVE"
+# Part 3: Remaining space for BTRFS Root
+sgdisk -n 3:0:0 -t 3:8300 -c 3:"ROOT" "$TARGET_DRIVE"
 
 if [[ "$TARGET_DRIVE" == *"nvme"* ]]; then
-    EFI_PART="${TARGET_DRIVE}p1"
-    ROOT_PART="${TARGET_DRIVE}p2"
+    EFI_PART="${TARGET_DRIVE}p2"
+    ROOT_PART="${TARGET_DRIVE}p3"
 else
-    EFI_PART="${TARGET_DRIVE}1"
-    ROOT_PART="${TARGET_DRIVE}2"
+    EFI_PART="${TARGET_DRIVE}2"
+    ROOT_PART="${TARGET_DRIVE}3"
 fi
 
 echo "Formatting partitions..."
@@ -74,6 +79,8 @@ mkdir -p /mnt/{home,var/log,var/cache/pacman/pkg,boot}
 mount -o "$MNT_OPTS,subvol=@home" "$ROOT_PART" /mnt/home
 mount -o "$MNT_OPTS,subvol=@log" "$ROOT_PART" /mnt/var/log
 mount -o "$MNT_OPTS,subvol=@pkg" "$ROOT_PART" /mnt/var/cache/pacman/pkg
+
+# Mount the EFI partition (Limine uses this as the general boot directory)
 mount "$EFI_PART" /mnt/boot
 
 # --- 4. The Pacstrap ---
@@ -81,8 +88,7 @@ echo "Updating Arch Keyring to prevent package installation failures..."
 pacman -Sy archlinux-keyring --noconfirm
 
 echo "Installing base system and ZypherOS dependencies..."
-# Added base-devel so your testers can compile AUR packages later
-pacstrap -K /mnt base base-devel linux linux-firmware btrfs-progs sudo networkmanager neovim git plasma sddm limine snapper efibootmgr $GPU_PKG
+pacstrap -K /mnt base base-devel linux linux-firmware btrfs-progs sudo networkmanager neovim git plasma sddm limine snapper efibootmgr mtools $GPU_PKG
 
 echo "Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -110,15 +116,11 @@ sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 systemctl enable NetworkManager
 systemctl enable sddm
 
-# Initialize Snapper
+# Initialize Snapper (Nested matching your layout)
 snapper -c root create-config /
 snapper -c home create-config /home
 chmod 750 /.snapshots
 chmod 750 /home/.snapshots
-
-# Configure Limine Bootloader
-mkdir -p /boot/EFI/BOOT
-cp /usr/share/limine/BOOTX64.EFI /boot/EFI/BOOT/
 
 # Write the custom Limine Config securely
 echo "timeout: 5" > /boot/limine.conf
@@ -129,8 +131,16 @@ echo "    kernel_path: boot():/vmlinuz-linux" >> /boot/limine.conf
 echo "    module_path: boot():/initramfs-linux.img" >> /boot/limine.conf
 echo "    cmdline: root=UUID=\$(blkid -s UUID -o value $ROOT_PART) rootflags=subvol=@ rw" >> /boot/limine.conf
 
-# Register Limine directly into the Motherboard NVRAM
-efibootmgr --create --disk "$TARGET_DRIVE" --part 1 --loader '\EFI\BOOT\BOOTX64.EFI' --label "ZypherOS" --unicode
+# Detect Firmware and Install Bootloader Accordingly
+if [ -d "/sys/firmware/efi" ]; then
+    echo "UEFI detected. Registering ZypherOS with efibootmgr..."
+    mkdir -p /boot/EFI/BOOT
+    cp /usr/share/limine/BOOTX64.EFI /boot/EFI/BOOT/
+    efibootmgr --create --disk "$TARGET_DRIVE" --part 2 --loader '\EFI\BOOT\BOOTX64.EFI' --label "ZypherOS" --unicode
+else
+    echo "Legacy BIOS detected. Deploying Limine to the MBR and BIOS Boot Partition..."
+    limine bios-install "$TARGET_DRIVE"
+fi
 
 EOF
 
