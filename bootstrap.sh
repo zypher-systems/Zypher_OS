@@ -24,9 +24,9 @@ echo "4) Virtual Machine (QEMU/VMware)"
 read -p "Selection (1-4): " GPU_CHOICE < /dev/tty
 
 case $GPU_CHOICE in
-    1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon" ;;
+    1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode" ;;
     2) GPU_PKG="nvidia nvidia-utils" ;;
-    3) GPU_PKG="mesa xf86-video-intel vulkan-intel" ;;
+    3) GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode" ;;
     4) GPU_PKG="mesa" ;;
     *) echo "Invalid choice. Exiting."; exit 1 ;;
 esac
@@ -69,21 +69,20 @@ umount /mnt
 echo "Mounting subvolumes..."
 MNT_OPTS="noatime,compress=zstd,space_cache=v2"
 mount -o "$MNT_OPTS,subvol=@" "$ROOT_PART" /mnt
-
-# Create the mount points for the isolated directories
 mkdir -p /mnt/{home,var/log,var/cache/pacman/pkg,boot}
 
-# Mount the specific subvolumes
 mount -o "$MNT_OPTS,subvol=@home" "$ROOT_PART" /mnt/home
 mount -o "$MNT_OPTS,subvol=@log" "$ROOT_PART" /mnt/var/log
 mount -o "$MNT_OPTS,subvol=@pkg" "$ROOT_PART" /mnt/var/cache/pacman/pkg
-
-# Mount the EFI partition
 mount "$EFI_PART" /mnt/boot
 
 # --- 4. The Pacstrap ---
+echo "Updating Arch Keyring to prevent package installation failures..."
+pacman -Sy archlinux-keyring --noconfirm
+
 echo "Installing base system and ZypherOS dependencies..."
-pacstrap -K /mnt base linux linux-firmware btrfs-progs sudo networkmanager neovim git plasma sddm limine snapper efibootmgr $GPU_PKG
+# Added base-devel so your testers can compile AUR packages later
+pacstrap -K /mnt base base-devel linux linux-firmware btrfs-progs sudo networkmanager neovim git plasma sddm limine snapper efibootmgr $GPU_PKG
 
 echo "Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -111,7 +110,7 @@ sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 systemctl enable NetworkManager
 systemctl enable sddm
 
-# Initialize Snapper (Replicating your exact nested setup)
+# Initialize Snapper
 snapper -c root create-config /
 snapper -c home create-config /home
 chmod 750 /.snapshots
@@ -121,16 +120,17 @@ chmod 750 /home/.snapshots
 mkdir -p /boot/EFI/BOOT
 cp /usr/share/limine/BOOTX64.EFI /boot/EFI/BOOT/
 
-# Write the custom Limine Config
-cat <<LIMINE > /boot/limine.conf
-timeout: 5
+# Write the custom Limine Config securely
+echo "timeout: 5" > /boot/limine.conf
+echo "" >> /boot/limine.conf
+echo ":ZypherOS" >> /boot/limine.conf
+echo "    protocol: linux" >> /boot/limine.conf
+echo "    kernel_path: boot():/vmlinuz-linux" >> /boot/limine.conf
+echo "    module_path: boot():/initramfs-linux.img" >> /boot/limine.conf
+echo "    cmdline: root=UUID=\$(blkid -s UUID -o value $ROOT_PART) rootflags=subvol=@ rw" >> /boot/limine.conf
 
-:ZypherOS
-    protocol: linux
-    kernel_path: boot():/vmlinuz-linux
-    module_path: boot():/initramfs-linux.img
-    cmdline: root=UUID=\$(blkid -s UUID -o value $ROOT_PART) rootflags=subvol=@ rw
-LIMINE
+# Register Limine directly into the Motherboard NVRAM
+efibootmgr --create --disk "$TARGET_DRIVE" --part 1 --loader '\EFI\BOOT\BOOTX64.EFI' --label "ZypherOS" --unicode
 
 EOF
 
