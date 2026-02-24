@@ -21,6 +21,7 @@ PACKAGES=(
   wget
   xclip
   wl-clipboard
+  partitionmanager
 
   # Apps
   ghostty
