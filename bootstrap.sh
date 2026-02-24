@@ -95,7 +95,7 @@ echo "Updating Arch Keyring to prevent package installation failures..."
 pacman -Sy archlinux-keyring --noconfirm
 
 echo "Installing base system and ZypherOS dependencies..."
-pacstrap -K /mnt base base-devel linux linux-firmware btrfs-progs sudo networkmanager neovim git plasma sddm limine snapper efibootmgr mtools $GPU_PKG
+pacstrap -K /mnt base base-devel linux linux-firmware btrfs-progs sudo networkmanager neovim git plasma sddm limine snapper efibootmgr mtools konsole dolphin ark spectacle pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil noto-fonts noto-fonts-emoji $GPU_PKG
 
 echo "Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
