@@ -5,6 +5,13 @@ echo "========================================="
 echo "   ZypherOS Installer - Alpha Release    "
 echo "========================================="
 
+# --- 0. Firmware Check for User Awareness ---
+if [ ! -d "/sys/firmware/efi" ]; then
+    echo "Notice: Booted in Legacy BIOS (SeaBIOS) mode. Proceeding with hybrid MBR/GPT install."
+else
+    echo "Notice: Booted in UEFI mode. Proceeding with standard EFI install."
+fi
+
 # --- 1. The Interview ---
 echo "Available Drives:"
 lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop"
@@ -80,7 +87,7 @@ mount -o "$MNT_OPTS,subvol=@home" "$ROOT_PART" /mnt/home
 mount -o "$MNT_OPTS,subvol=@log" "$ROOT_PART" /mnt/var/log
 mount -o "$MNT_OPTS,subvol=@pkg" "$ROOT_PART" /mnt/var/cache/pacman/pkg
 
-# Mount the EFI partition (Limine uses this as the general boot directory)
+# Mount the EFI partition
 mount "$EFI_PART" /mnt/boot
 
 # --- 4. The Pacstrap ---
@@ -106,6 +113,9 @@ sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
+# Silence the mkinitcpio vconsole warning
+echo "KEYMAP=us" > /etc/vconsole.conf
+
 # Create User
 useradd -m -G wheel -s /bin/bash $USERNAME
 echo "$USERNAME:$PASSWORD" | chpasswd
@@ -122,6 +132,13 @@ snapper -c home create-config /home
 chmod 750 /.snapshots
 chmod 750 /home/.snapshots
 
+# Configure Limine Bootloader
+mkdir -p /boot/EFI/BOOT
+
+# Copy both UEFI and BIOS Stage 3 payloads so the drive is fully hybrid
+cp /usr/share/limine/BOOTX64.EFI /boot/EFI/BOOT/
+cp /usr/share/limine/limine-bios.sys /boot/
+
 # Write the custom Limine Config securely
 echo "timeout: 5" > /boot/limine.conf
 echo "" >> /boot/limine.conf
@@ -134,8 +151,6 @@ echo "    cmdline: root=UUID=\$(blkid -s UUID -o value $ROOT_PART) rootflags=sub
 # Detect Firmware and Install Bootloader Accordingly
 if [ -d "/sys/firmware/efi" ]; then
     echo "UEFI detected. Registering ZypherOS with efibootmgr..."
-    mkdir -p /boot/EFI/BOOT
-    cp /usr/share/limine/BOOTX64.EFI /boot/EFI/BOOT/
     efibootmgr --create --disk "$TARGET_DRIVE" --part 2 --loader '\EFI\BOOT\BOOTX64.EFI' --label "ZypherOS" --unicode
 else
     echo "Legacy BIOS detected. Deploying Limine to the MBR and BIOS Boot Partition..."
