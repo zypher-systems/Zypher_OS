@@ -1,0 +1,6 @@
+# Ignore Archiso build outputs and work directories
+work/
+out/
+*.iso
+*.img
+*.sfs
