@@ -142,6 +142,7 @@ echo "KEYMAP=us" > /mnt/etc/vconsole.conf
 
 # --- 4. The Pacstrap ---
 echo "Preparing ZypherOS package lists..."
+# Note: flatpak has been removed. Discord has been added natively.
 ZYPHER_PACKAGES=(
   base base-devel linux linux-lts linux-firmware btrfs-progs sudo networkmanager
   $GPU_PKG limine snapper efibootmgr mtools
@@ -149,7 +150,7 @@ ZYPHER_PACKAGES=(
   konsole dolphin ark spectacle kate gwenview okular partitionmanager
   git fastfetch fish neovim starship zoxide thefuck eza bat btop
   lazygit ripgrep fd unzip wget xclip wl-clipboard ghostty gimp blender 
-  inkscape libreoffice-fresh pika-backup obs-studio flatpak kdenlive thunderbird
+  inkscape libreoffice-fresh pika-backup obs-studio kdenlive thunderbird discord
   ttf-meslo-nerd noto-fonts noto-fonts-emoji
 )
 
@@ -161,7 +162,14 @@ genfstab -U /mnt >>/mnt/etc/fstab
 # --- 4.5. Stage Skeleton Directory & System Configs ---
 echo "Staging system configurations and user dotfiles (/etc/skel)..."
 
-mkdir -p /mnt/etc/skel/.config/{ghostty/themes,fish,fastfetch,nvim}
+mkdir -p /mnt/etc/skel/.config/{ghostty/themes,fish,fastfetch,nvim,discord}
+
+# --- Discord Update Blocker Fix ---
+cat <<'SKEL' > /mnt/etc/skel/.config/discord/settings.json
+{
+  "SKIP_HOST_UPDATE": true
+}
+SKEL
 
 cat <<'SKEL' > /mnt/etc/skel/.config/ghostty/themes/carbonfox
 palette = 0=#282828
@@ -565,18 +573,22 @@ chown -R sddm:sddm /var/lib/sddm/.config
 echo "Bootstrapping Neovim plugins for \$USERNAME..."
 sudo -u "\$USERNAME" nvim --headless "+Lazy! sync" +qa >/dev/null 2>&1 || true
 
-# --- Install yay (AUR Helper) ---
-echo "Installing yay (AUR Helper)..."
+# --- Install yay (AUR Helper) & Native Packages ---
+echo "Installing yay and AUR packages..."
 useradd -m -s /bin/bash builduser
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 chmod 440 /etc/sudoers.d/builduser
 
+# Install yay
 sudo -u builduser git clone https://aur.archlinux.org/yay-bin.git /home/builduser/yay-bin
 sudo -u builduser bash -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm"
 
+# Install Google Chrome via yay
+sudo -u builduser bash -c "yay -S --noconfirm google-chrome"
+
 rm /etc/sudoers.d/builduser
 userdel -r builduser
-# --------------------------------
+# ------------------------------------------------
 
 systemctl enable NetworkManager
 systemctl enable sddm
