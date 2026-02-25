@@ -34,8 +34,8 @@ cd "$TEMP_DIR/subscripts"
 chmod +x *.sh
 
 # Run in order
-./01-repos.sh
-./02-packages.sh
+#./01-repos.sh
+#./02-packages.sh
 ./03-flatpak.sh
 ./04-aur.sh
 ./05-ghostty.sh
