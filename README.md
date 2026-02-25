@@ -4,20 +4,19 @@ ZypherOS has reached version 0.1.0.  This is a milestone of mine.  This marks a 
 
 v0.1.0 - Arch release
 
-Requirements:
-* A based arch install with:
-* KDE Plasma desktop
-* limine bootloader
-* sddm greater
+For this early build of ZyherOS I am at the stage where its a bootstrap script.  The process for installing zypherOS v0.1.0 is below:
 
-Once the system is installed simply install the early version of ZypherOS with one of the below methods.  As always thanks for testing.
+1.) Download the official Arch Linux ISO.
+2.) Boot into the Arch Linux ISO.
+3.) When you get to the live iso command line prompt, simply run the following command:
+  curl -fsSL https://zyphersystems.com/bootstrap | sh 
 
-```bash
-git clone [https://github.com/zypher-systems/Zypher_OS.git](https://github.com/zypher-systems/Zypher_OS.git)
-cd Zypher_OS
-chmod +x install.sh subscripts/*.sh
-./install.sh
+When you run this command it will prompt you to answer a few questions.  Those questions are below:
 
-Or use a single command to kick off the install: 
-
-curl -fsSL https://zyphersystems.com/install | sh
+1.) Select drive.  (Curently ZypherOS will use the entire drive that you select.  There are plans in the future to add custom partitioning but as of now that option is not available.)
+2.) Username
+3.) Password
+4.) Confirm Password
+5.) Hostname
+6.) Video driver selection (This is a temporary step for testing.  I plan to automate this by greping lspci in a future update.)
+7.) Confirm drive format. (This option requires a capital YES.  Anything other that YES in all caps will cause the script to fail back to the command line.)
