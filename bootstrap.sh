@@ -136,6 +136,11 @@ echo "Synchronizing package databases with ZypherOS repos..."
 pacman -Sy archlinux-keyring --noconfirm
 pacman -Syy --noconfirm
 
+# --- 3.8. Pre-Pacstrap System Config ---
+# Silence the mkinitcpio vconsole warning during pacstrap
+mkdir -p /mnt/etc
+echo "KEYMAP=us" > /mnt/etc/vconsole.conf
+
 # --- 4. The Pacstrap ---
 echo "Preparing ZypherOS package lists..."
 ZYPHER_PACKAGES=(
@@ -196,7 +201,6 @@ shell-integration = fish
 SKEL
 
 # Fish Config
-# We use 'SKEL' in quotes so $USER and $PATH don't evaluate during the install phase
 cat <<'SKEL' > /mnt/etc/skel/.config/fish/config.fish
 if status is-interactive
     set -gx EDITOR nvim
@@ -449,10 +453,6 @@ cat <<'SKEL' > /mnt/etc/skel/.config/kcminputrc
 NumLock=0
 SKEL
 
-# LazyVim Clone
-git clone https://github.com/zypher-systems/nvim-config.git /mnt/etc/skel/.config/nvim
-rm -rf /mnt/etc/skel/.config/nvim/.git
-
 # System-wide Terminal Default
 echo "TERMINAL=ghostty" >> /mnt/etc/environment
 
@@ -477,10 +477,14 @@ hwclock --systohc
 sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
-echo "KEYMAP=us" > /etc/vconsole.conf
+
+# Clone Neovim Config into Skeleton BEFORE user creation
+# (This executes inside the chroot, where 'git' is fully installed)
+echo "Cloning LazyVim profile..."
+git clone https://github.com/zypher-systems/nvim-config.git /etc/skel/.config/nvim
+rm -rf /etc/skel/.config/nvim/.git
 
 # Create User (Automatically pulls everything from /etc/skel!)
-# Shell changed from bash to fish
 useradd -m -G wheel -s /usr/bin/fish $USERNAME
 echo "$USERNAME:$PASSWORD" | chpasswd
 echo "root:$PASSWORD" | chpasswd
