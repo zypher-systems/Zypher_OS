@@ -15,60 +15,85 @@ whiptail --title "ZypherOS Installer - Alpha Release" --msgbox "Welcome to the Z
 # Drive Selection
 DRIVE_OPTIONS=()
 while read -r name size model; do
-    DRIVE_OPTIONS+=("$name" "$model ($size)")
+  DRIVE_OPTIONS+=("$name" "$model ($size)")
 done < <(lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop" | grep -v "rom")
 
 TARGET_DRIVE=$(whiptail --title "Target Drive Configuration" --menu "Choose the drive to install ZypherOS on:\nWARNING: ALL DATA ON THIS DRIVE WILL BE WIPED!" 15 65 5 "${DRIVE_OPTIONS[@]}" 3>&1 1>&2 2>&3)
-if [ -z "$TARGET_DRIVE" ]; then clear; echo "Installation canceled."; exit 1; fi
+if [ -z "$TARGET_DRIVE" ]; then
+  clear
+  echo "Installation canceled."
+  exit 1
+fi
 
 # User Setup
 USERNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the desired username for the primary account:" 10 60 "user" 3>&1 1>&2 2>&3)
-if [ -z "$USERNAME" ]; then clear; echo "Installation canceled."; exit 1; fi
+if [ -z "$USERNAME" ]; then
+  clear
+  echo "Installation canceled."
+  exit 1
+fi
 
 # Password Setup
 while true; do
   PASSWORD=$(whiptail --title "Security Setup" --passwordbox "Enter the password for $USERNAME (This will also be the Root password):" 10 60 3>&1 1>&2 2>&3)
   PASSWORD_CONFIRM=$(whiptail --title "Security Setup" --passwordbox "Confirm your password:" 10 60 3>&1 1>&2 2>&3)
-  
-  if [ "$PASSWORD" == "$PASSWORD_CONFIRM" ] && [ -n "$PASSWORD" ]; then 
-      break
-  else 
-      whiptail --title "Error" --msgbox "Passwords do not match or are empty. Please try again." 10 60
+
+  if [ "$PASSWORD" == "$PASSWORD_CONFIRM" ] && [ -n "$PASSWORD" ]; then
+    break
+  else
+    whiptail --title "Error" --msgbox "Passwords do not match or are empty. Please try again." 10 60
   fi
 done
 
 # Hostname Setup
 HOSTNAME=$(whiptail --title "Network Setup" --inputbox "Enter the system hostname (Computer Name):" 10 60 "zypheros" 3>&1 1>&2 2>&3)
-if [ -z "$HOSTNAME" ]; then clear; echo "Installation canceled."; exit 1; fi
+if [ -z "$HOSTNAME" ]; then
+  clear
+  echo "Installation canceled."
+  exit 1
+fi
 
 # Smart GPU Auto-Detect
 GPU_VENDOR=$(lspci -vnn | grep -iE 'VGA|3D' | grep -iE 'NVIDIA|AMD|Advanced Micro Devices|Intel' | head -n 1)
-if echo "$GPU_VENDOR" | grep -iq "NVIDIA"; then DETECTED="NVIDIA"; DEFAULT="2";
-elif echo "$GPU_VENDOR" | grep -iqE "AMD|Advanced Micro Devices"; then DETECTED="AMD"; DEFAULT="1";
-elif echo "$GPU_VENDOR" | grep -iq "Intel"; then DETECTED="Intel"; DEFAULT="3";
-else DETECTED="Virtual Machine / Generic"; DEFAULT="4"; fi
+if echo "$GPU_VENDOR" | grep -iq "NVIDIA"; then
+  DETECTED="NVIDIA"
+  DEFAULT="2"
+elif echo "$GPU_VENDOR" | grep -iqE "AMD|Advanced Micro Devices"; then
+  DETECTED="AMD"
+  DEFAULT="1"
+elif echo "$GPU_VENDOR" | grep -iq "Intel"; then
+  DETECTED="Intel"
+  DEFAULT="3"
+else
+  DETECTED="Virtual Machine / Generic"
+  DEFAULT="4"
+fi
 
 GPU_CHOICE=$(whiptail --title "Graphics Drivers" --menu "Hardware Scan detected: $DETECTED\n\nPlease verify your graphics driver deployment:" 15 65 4 \
-"1" "AMD (Open Source) - Recommended" \
-"2" "NVIDIA (Proprietary)" \
-"3" "Intel" \
-"4" "Virtual Machine (QEMU/VMware/VirtIO)" \
---default-item "$DEFAULT" 3>&1 1>&2 2>&3)
+  "1" "AMD (Open Source) - Recommended" \
+  "2" "NVIDIA (Proprietary)" \
+  "3" "Intel" \
+  "4" "Virtual Machine (QEMU/VMware/VirtIO)" \
+  --default-item "$DEFAULT" 3>&1 1>&2 2>&3)
 
-if [ -z "$GPU_CHOICE" ]; then clear; echo "Installation canceled."; exit 1; fi
+if [ -z "$GPU_CHOICE" ]; then
+  clear
+  echo "Installation canceled."
+  exit 1
+fi
 
 case $GPU_CHOICE in
-  1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode" ;;
-  2) GPU_PKG="nvidia nvidia-utils" ;;
-  3) GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode" ;;
-  4) GPU_PKG="mesa" ;;
+1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode" ;;
+2) GPU_PKG="nvidia nvidia-utils" ;;
+3) GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode" ;;
+4) GPU_PKG="mesa" ;;
 esac
 
 # Final Point of No Return
 if ! whiptail --title "WARNING: DATA DESTRUCTION" --yesno "You are about to COMPLETELY WIPE the following drive:\n\n$TARGET_DRIVE\n\nAre you absolutely sure you want to proceed?" 12 60; then
-    clear
-    echo "Installation aborted by user."
-    exit 1
+  clear
+  echo "Installation aborted by user."
+  exit 1
 fi
 
 clear
@@ -122,7 +147,7 @@ sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
 
 echo "Fetching Arch Linux Global CDN..."
-echo 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' > /etc/pacman.d/mirrorlist
+echo 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' >/etc/pacman.d/mirrorlist
 
 echo "Synchronizing package databases..."
 pacman -Sy archlinux-keyring --noconfirm
@@ -130,7 +155,7 @@ pacman -Syy --noconfirm
 
 # --- 3.8. Pre-Pacstrap System Config ---
 mkdir -p /mnt/etc
-echo "KEYMAP=us" > /mnt/etc/vconsole.conf
+echo "KEYMAP=us" >/mnt/etc/vconsole.conf
 
 # --- 4. The Pacstrap ---
 echo "Preparing ZypherOS package lists..."
@@ -140,7 +165,7 @@ ZYPHER_PACKAGES=(
   plasma sddm pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil
   konsole dolphin ark spectacle kate gwenview okular partitionmanager
   git fastfetch fish neovim starship zoxide thefuck eza bat btop
-  lazygit ripgrep fd unzip wget xclip wl-clipboard ghostty gimp blender 
+  lazygit ripgrep fd unzip wget xclip wl-clipboard ghostty gimp blender
   inkscape libreoffice-fresh pika-backup obs-studio kdenlive thunderbird discord
   ttf-meslo-nerd noto-fonts noto-fonts-emoji
 )
@@ -149,19 +174,18 @@ echo "Installing base system and ZypherOS dependencies..."
 pacstrap -K /mnt "${ZYPHER_PACKAGES[@]}"
 genfstab -U /mnt >>/mnt/etc/fstab
 
-
 # --- 4.5. Stage Skeleton Directory & System Configs ---
 echo "Staging system configurations and user dotfiles (/etc/skel)..."
 
 mkdir -p /mnt/etc/skel/.config/{ghostty/themes,fish,fastfetch,nvim,discord}
 
-cat <<'SKEL' > /mnt/etc/skel/.config/discord/settings.json
+cat <<'SKEL' >/mnt/etc/skel/.config/discord/settings.json
 {
   "SKIP_HOST_UPDATE": true
 }
 SKEL
 
-cat <<'SKEL' > /mnt/etc/skel/.config/ghostty/themes/carbonfox
+cat <<'SKEL' >/mnt/etc/skel/.config/ghostty/themes/carbonfox
 palette = 0=#282828
 palette = 1=#ee5396
 palette = 2=#25be6a
@@ -185,7 +209,7 @@ selection-background = 2a2a2a
 selection-foreground = f2f4f8
 SKEL
 
-cat <<'SKEL' > /mnt/etc/skel/.config/ghostty/config
+cat <<'SKEL' >/mnt/etc/skel/.config/ghostty/config
 command = /usr/bin/fish
 font-family = MesloLGS Nerd Font Mono
 font-family-bold = MesloLGS Nerd Font Mono Bold
@@ -196,7 +220,7 @@ theme = carbonfox
 shell-integration = fish
 SKEL
 
-cat <<'SKEL' > /mnt/etc/skel/.config/fish/config.fish
+cat <<'SKEL' >/mnt/etc/skel/.config/fish/config.fish
 if status is-interactive
     set -gx EDITOR nvim
     set -gx BROWSER firefox
@@ -346,7 +370,7 @@ if status is-interactive
 end
 SKEL
 
-cat <<'SKEL' > /mnt/etc/skel/.config/fastfetch/config.jsonc
+cat <<'SKEL' >/mnt/etc/skel/.config/fastfetch/config.jsonc
 {
     "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
     "logo": {
@@ -433,19 +457,19 @@ cat <<'SKEL' > /mnt/etc/skel/.config/fastfetch/config.jsonc
 }
 SKEL
 
-cat <<'SKEL' > /mnt/etc/skel/.config/kdeglobals
+cat <<'SKEL' >/mnt/etc/skel/.config/kdeglobals
 [General]
 ColorScheme=BreezeDark
 Name=Breeze Dark
 TerminalApplication=ghostty
 SKEL
 
-cat <<'SKEL' > /mnt/etc/skel/.config/kcminputrc
+cat <<'SKEL' >/mnt/etc/skel/.config/kcminputrc
 [Keyboard]
 NumLock=0
 SKEL
 
-echo "TERMINAL=ghostty" >> /mnt/etc/environment
+echo "TERMINAL=ghostty" >>/mnt/etc/environment
 
 # --- 5. The Chroot Handoff ---
 echo "Generating internal configuration script..."
@@ -482,12 +506,12 @@ pacman -Sy
 # ----------------------------------------------------
 
 # --- BRANDING ASSET DEPLOYMENT ---
-echo "Cloning ZypherOS repository for branding assets..."
+echo "Downloading ZypherOS branding assets..."
 mkdir -p /usr/share/zypheros/branding
-git clone https://github.com/zypher-systems/Zypher_OS.git /tmp/zypher_os_repo
-cp /tmp/zypher_os_repo/images/zypher_os_wallpaper.png /usr/share/zypheros/branding/wallpaper.png
-cp /tmp/zypher_os_repo/images/zypher_os_launcher_icon.png /usr/share/zypheros/branding/icon.png
-rm -rf /tmp/zypher_os_repo
+
+# Pull raw files directly from GitHub
+curl -sL "https://raw.githubusercontent.com/zypher-systems/Zypher_OS/main/images/zypher_os_wallpaper.png" -o /usr/share/zypheros/branding/wallpaper.png
+curl -sL "https://raw.githubusercontent.com/zypher-systems/Zypher_OS/main/images/zypher_os_launcher_icon.png" -o /usr/share/zypheros/branding/icon.png
 
 echo "Generating Dynamic Upscaled ASCII Fastfetch Logo..."
 echo -e "\033[1;36m---------------------------------------" > /usr/share/zypheros/branding/logo.txt
