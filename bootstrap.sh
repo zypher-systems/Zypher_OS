@@ -491,9 +491,9 @@ rm -rf /tmp/zypher_os_repo
 
 echo "Generating Dynamic Upscaled ASCII Fastfetch Logo..."
 echo -e "\033[1;36m---------------------------------------" > /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m|@@:::::::::::::::::::::::::::::::::@@@" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m|@@:::::::::::::::::::::::::::::::::@@|" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
 echo -e "\033[1;36m|-------------------------Z:::::::::S" >> /usr/share/zypheros/branding/logo.txt
 echo -e "\033[1;36m                         /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
 echo -e "\033[1;36m                        Y:::::::::Y" >> /usr/share/zypheros/branding/logo.txt
