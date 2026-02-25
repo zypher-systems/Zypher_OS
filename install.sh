@@ -38,12 +38,12 @@ chmod +x *.sh
 #./02-packages.sh
 ./03-flatpak.sh
 ./04-aur.sh
-./05-ghostty.sh
-./06-fish.sh
-./07-fastfetch.sh
-./08-plasma.sh
+#./05-ghostty.sh
+#./06-fish.sh
+#./07-fastfetch.sh
+#./08-plasma.sh
 ./09-branding.sh
-./10-neovim.sh
+#./10-neovim.sh
 #./11-limine.sh
 
 # --- Cleanup ---
