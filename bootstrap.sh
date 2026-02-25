@@ -456,25 +456,12 @@ mkdir -p /mnt/etc/skel/.local/bin
 
 cat <<'EOF' > /mnt/etc/skel/.local/bin/zypher-branding.sh
 #!/bin/bash
-# Wait for Plasma to fully initialize
-sleep 3
+# Wait 10 seconds for Plasma 6 (Wayland) to fully initialize
+# The previous 3-second delay was too short for Virtual Machine graphics drivers
+sleep 10
 
 # Apply Wallpaper
 plasma-apply-wallpaperimage /usr/share/zypheros/branding/wallpaper.png
-
-# Inject new icon directly into the running Plasma taskbar using KDE Scripting
-qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
-var p = panels();
-for (var i=0; i<p.length; ++i) {
-    var w = p[i].widgets();
-    for (var j=0; j<w.length; ++j) {
-        if (w[j].type === 'org.kde.plasma.kickoff') {
-            w[j].currentConfigGroup = ['General'];
-            w[j].writeConfig('icon', '/usr/share/zypheros/branding/icon.png');
-        }
-    }
-}
-"
 
 # Clean up so this script never runs again
 rm "$HOME/.config/autostart/zypher-branding.desktop"
@@ -506,12 +493,26 @@ sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
+# --- Branding Assets Deployment ---
 echo "Cloning ZypherOS repository for branding assets..."
 mkdir -p /usr/share/zypheros/branding
 git clone https://github.com/zypher-systems/Zypher_OS.git /tmp/zypher_os_repo
 cp /tmp/zypher_os_repo/images/zypher_os_wallpaper.png /usr/share/zypheros/branding/wallpaper.png
 cp /tmp/zypher_os_repo/images/zypher_os_launcher_icon.png /usr/share/zypheros/branding/icon.png
 rm -rf /tmp/zypher_os_repo
+
+echo "Configuring User Local Assets (.local/share/zypher)..."
+# We must do this in /etc/skel so it replicates to the user automatically
+mkdir -p /etc/skel/.local/share/zypher/branding
+cp /usr/share/zypheros/branding/wallpaper.png /etc/skel/.local/share/zypher/branding/wallpaper.png
+cp /usr/share/zypheros/branding/icon.png /etc/skel/.local/share/zypher/branding/icon.png
+
+echo "Configuring Plasma Launcher Icon (Force Method)..."
+# We copy the system widget to the user's local path and patch the metadata directly.
+# This bypasses the icon cache and works on first boot without DBus scripting.
+mkdir -p /etc/skel/.local/share/plasma/plasmoids
+cp -r /usr/share/plasma/plasmoids/org.kde.plasma.kickoff /etc/skel/.local/share/plasma/plasmoids/
+sed -i 's|"Icon": ".*"|"Icon": "/usr/share/zypheros/branding/icon.png"|' /etc/skel/.local/share/plasma/plasmoids/org.kde.plasma.kickoff/metadata.json
 
 echo "Configuring SDDM Login Screen background and themes..."
 mkdir -p /etc/sddm.conf.d
@@ -535,11 +536,9 @@ echo "$USERNAME:$PASSWORD" | chpasswd
 echo "root:$PASSWORD" | chpasswd
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
-# Stage the global dark mode config for the SDDM background user
-mkdir -p /var/lib/sddm/.config
-cp /etc/skel/.config/kdeglobals /var/lib/sddm/.config/kdeglobals
 chown -R sddm:sddm /var/lib/sddm/.config
 
+# (Updated to use sudo -u to match the safe builduser method)
 echo "Bootstrapping Neovim plugins for \$USERNAME..."
 sudo -u "\$USERNAME" nvim --headless "+Lazy! sync" +qa >/dev/null 2>&1 || true
 
