@@ -22,7 +22,7 @@ TARGET_DRIVE=$(whiptail --title "Target Drive Configuration" --menu "Choose the 
 if [ -z "$TARGET_DRIVE" ]; then clear; echo "Installation canceled."; exit 1; fi
 
 # User Setup
-USERNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the desired username for the primary account:" 10 60 "user" 3>&1 1>&2 2>&3)
+USERNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the desired username for the primary account:" 10 60 "Dusty" 3>&1 1>&2 2>&3)
 if [ -z "$USERNAME" ]; then clear; echo "Installation canceled."; exit 1; fi
 
 # Password Setup
@@ -350,12 +350,12 @@ cat <<'SKEL' > /mnt/etc/skel/.config/fastfetch/config.jsonc
 {
     "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
     "logo": {
-        "type": "builtin",
-        "height": 15,
-        "width": 30,
+        "type": "file",
+        "source": "/usr/share/zypheros/branding/logo.txt",
         "padding": {
-            "top": 5,
-            "left": 3
+            "top": 1,
+            "left": 2,
+            "right": 2
         }
     },
     "modules": [
@@ -488,6 +488,24 @@ git clone https://github.com/zypher-systems/Zypher_OS.git /tmp/zypher_os_repo
 cp /tmp/zypher_os_repo/images/zypher_os_wallpaper.png /usr/share/zypheros/branding/wallpaper.png
 cp /tmp/zypher_os_repo/images/zypher_os_launcher_icon.png /usr/share/zypheros/branding/icon.png
 rm -rf /tmp/zypher_os_repo
+
+echo "Generating Dynamic ASCII Fastfetch Logo..."
+echo -e "\033[1;36m@@@@@@@@@@@@@@@@@@@" > /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m@:::::::::::::::::@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m@:::::::::::::::::@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m@:::@@@@@@@@:::::@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m@@@@@    Z:::::S" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m        Y:::::Y" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m       P:::::S" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m      H:::::T\033[1;35m" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m     E:::::E" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m    R:::::M" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m   @:::::S" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m@@@:::::@     @@@@@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m@::::::@@@@@@@@:::@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m@:::::::::::::::::@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m@:::::::::::::::::@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m@@@@@@@@@@@@@@@@@@@\033[0m" >> /usr/share/zypheros/branding/logo.txt
 
 echo "Configuring SDDM Login Screen background and themes..."
 mkdir -p /etc/sddm.conf.d
