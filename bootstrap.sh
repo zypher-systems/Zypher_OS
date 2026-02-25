@@ -51,27 +51,66 @@ done
 
 echo ""
 read -p "Enter system hostname: " HOSTNAME </dev/tty
-
 echo ""
-echo "Select Video Driver:"
-echo "  1) AMD (Open Source)"
-echo "  2) NVIDIA (Proprietary)"
-echo "  3) Intel"
-echo "  4) Virtual Machine (QEMU/VMware)"
-read -p "Selection (1-4): " GPU_CHOICE </dev/tty
 
-case $GPU_CHOICE in
-1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode" ;;
-2) GPU_PKG="nvidia nvidia-utils" ;;
-3) GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode" ;;
-4) GPU_PKG="mesa" ;;
-*)
-  echo "Invalid choice. Exiting."
-  exit 1
-  ;;
-esac
+# --- Smart GPU Auto-Detection ---
+echo "Detecting Graphics Hardware..."
+# Query PCI devices for VGA or 3D controllers and grab the first matching vendor
+GPU_VENDOR=$(lspci -vnn | grep -iE 'VGA|3D' | grep -iE 'NVIDIA|AMD|Advanced Micro Devices|Intel' | head -n 1)
 
+if echo "$GPU_VENDOR" | grep -iq "NVIDIA"; then
+  DETECTED_GPU="NVIDIA"
+  DEFAULT_GPU_PKG="nvidia nvidia-utils"
+elif echo "$GPU_VENDOR" | grep -iqE "AMD|Advanced Micro Devices"; then
+  DETECTED_GPU="AMD"
+  DEFAULT_GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode"
+elif echo "$GPU_VENDOR" | grep -iq "Intel"; then
+  DETECTED_GPU="Intel"
+  DEFAULT_GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode"
+else
+  DETECTED_GPU="Virtual Machine / Generic"
+  DEFAULT_GPU_PKG="mesa"
+fi
+
+echo "  -> $DETECTED_GPU GPU detected."
 echo ""
+echo "The installer will automatically proceed with the appropriate $DETECTED_GPU drivers."
+echo "Press any key within 5 seconds to manually override this selection..."
+
+OVERRIDE=false
+for i in {5..1}; do
+  echo -ne "\rAuto-selecting in $i seconds... "
+  if read -t 1 -n 1 -s </dev/tty; then
+    OVERRIDE=true
+    break
+  fi
+done
+echo ""
+
+if [ "$OVERRIDE" = true ]; then
+  echo ""
+  echo "--- Manual GPU Selection ---"
+  echo "  1) AMD (Open Source)"
+  echo "  2) NVIDIA (Proprietary)"
+  echo "  3) Intel"
+  echo "  4) Virtual Machine (QEMU/VMware)"
+  while true; do
+    read -p "Selection (1-4): " GPU_CHOICE </dev/tty
+    case $GPU_CHOICE in
+      1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode"; break ;;
+      2) GPU_PKG="nvidia nvidia-utils"; break ;;
+      3) GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode"; break ;;
+      4) GPU_PKG="mesa"; break ;;
+      *) echo "Invalid choice. Please select 1-4." ;;
+    esac
+  done
+else
+  GPU_PKG=$DEFAULT_GPU_PKG
+fi
+
+echo "Selected driver packages: $GPU_PKG"
+echo ""
+
 echo "WARNING: This will COMPLETELY WIPE $TARGET_DRIVE."
 read -p "Are you sure you want to continue? (Type YES to proceed): " CONFIRM </dev/tty
 if [ "$CONFIRM" != "YES" ]; then
