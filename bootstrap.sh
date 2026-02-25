@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e 
+set -e
 
 echo "========================================="
 echo "   ZypherOS Installer - Alpha Release    "
@@ -7,9 +7,9 @@ echo "========================================="
 
 # --- 0. Firmware Check for User Awareness ---
 if [ ! -d "/sys/firmware/efi" ]; then
-    echo "Notice: Booted in Legacy BIOS (SeaBIOS) mode. Proceeding with hybrid MBR/GPT install."
+  echo "Notice: Booted in Legacy BIOS (SeaBIOS) mode. Proceeding with hybrid MBR/GPT install."
 else
-    echo "Notice: Booted in UEFI mode. Proceeding with standard EFI install."
+  echo "Notice: Booted in UEFI mode. Proceeding with standard EFI install."
 fi
 echo ""
 
@@ -20,42 +20,42 @@ mapfile -t DRIVE_ARRAY < <(lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop"
 
 # Print the numbered list dynamically
 for i in "${!DRIVE_ARRAY[@]}"; do
-    echo "  $((i+1))) ${DRIVE_ARRAY[$i]}"
+  echo "  $((i + 1))) ${DRIVE_ARRAY[$i]}"
 done
 echo ""
 
 # Trap the user until they enter a valid number
 while true; do
-    read -p "Select the number of the target drive (1-${#DRIVE_ARRAY[@]}): " DRIVE_NUM < /dev/tty
-    if [[ "$DRIVE_NUM" =~ ^[0-9]+$ ]] && [ "$DRIVE_NUM" -ge 1 ] && [ "$DRIVE_NUM" -le "${#DRIVE_ARRAY[@]}" ]; then
-        # Extract just the device path (e.g., /dev/sda) from the selection
-        TARGET_DRIVE=$(echo "${DRIVE_ARRAY[$((DRIVE_NUM-1))]}" | awk '{print $1}')
-        echo "Selected target: $TARGET_DRIVE"
-        break
-    else
-        echo "Invalid selection. Please pick a number from the list."
-    fi
+  read -p "Select the number of the target drive (1-${#DRIVE_ARRAY[@]}): " DRIVE_NUM </dev/tty
+  if [[ "$DRIVE_NUM" =~ ^[0-9]+$ ]] && [ "$DRIVE_NUM" -ge 1 ] && [ "$DRIVE_NUM" -le "${#DRIVE_ARRAY[@]}" ]; then
+    # Extract just the device path (e.g., /dev/sda) from the selection
+    TARGET_DRIVE=$(echo "${DRIVE_ARRAY[$((DRIVE_NUM - 1))]}" | awk '{print $1}')
+    echo "Selected target: $TARGET_DRIVE"
+    break
+  else
+    echo "Invalid selection. Please pick a number from the list."
+  fi
 done
 
 echo ""
-read -p "Enter desired username: " USERNAME < /dev/tty
+read -p "Enter desired username: " USERNAME </dev/tty
 
 # Trap the user until passwords match
 while true; do
-    read -sp "Enter password for $USERNAME (and Root): " PASSWORD < /dev/tty
-    echo ""
-    read -sp "Confirm password: " PASSWORD_CONFIRM < /dev/tty
-    echo ""
-    if [ "$PASSWORD" == "$PASSWORD_CONFIRM" ]; then
-        echo "Passwords match."
-        break
-    else
-        echo "Error: Passwords do not match. Please try again."
-    fi
+  read -sp "Enter password for $USERNAME (and Root): " PASSWORD </dev/tty
+  echo ""
+  read -sp "Confirm password: " PASSWORD_CONFIRM </dev/tty
+  echo ""
+  if [ "$PASSWORD" == "$PASSWORD_CONFIRM" ]; then
+    echo "Passwords match."
+    break
+  else
+    echo "Error: Passwords do not match. Please try again."
+  fi
 done
 
 echo ""
-read -p "Enter system hostname: " HOSTNAME < /dev/tty
+read -p "Enter system hostname: " HOSTNAME </dev/tty
 
 echo ""
 echo "Select Video Driver:"
@@ -63,22 +63,25 @@ echo "  1) AMD (Open Source)"
 echo "  2) NVIDIA (Proprietary)"
 echo "  3) Intel"
 echo "  4) Virtual Machine (QEMU/VMware)"
-read -p "Selection (1-4): " GPU_CHOICE < /dev/tty
+read -p "Selection (1-4): " GPU_CHOICE </dev/tty
 
 case $GPU_CHOICE in
-    1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode" ;;
-    2) GPU_PKG="nvidia nvidia-utils" ;;
-    3) GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode" ;;
-    4) GPU_PKG="mesa" ;;
-    *) echo "Invalid choice. Exiting."; exit 1 ;;
+1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode" ;;
+2) GPU_PKG="nvidia nvidia-utils" ;;
+3) GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode" ;;
+4) GPU_PKG="mesa" ;;
+*)
+  echo "Invalid choice. Exiting."
+  exit 1
+  ;;
 esac
 
 echo ""
 echo "WARNING: This will COMPLETELY WIPE $TARGET_DRIVE."
-read -p "Are you sure you want to continue? (Type YES to proceed): " CONFIRM < /dev/tty
+read -p "Are you sure you want to continue? (Type YES to proceed): " CONFIRM </dev/tty
 if [ "$CONFIRM" != "YES" ]; then
-    echo "Aborting installation."
-    exit 1
+  echo "Aborting installation."
+  exit 1
 fi
 
 # --- 2. Universal Partitioning (Supports UEFI & SeaBIOS) ---
@@ -93,11 +96,11 @@ sgdisk -n 2:0:+1024M -t 2:ef00 -c 2:"EFI" "$TARGET_DRIVE"
 sgdisk -n 3:0:0 -t 3:8300 -c 3:"ROOT" "$TARGET_DRIVE"
 
 if [[ "$TARGET_DRIVE" == *"nvme"* ]] || [[ "$TARGET_DRIVE" == *"mmcblk"* ]]; then
-    EFI_PART="${TARGET_DRIVE}p2"
-    ROOT_PART="${TARGET_DRIVE}p3"
+  EFI_PART="${TARGET_DRIVE}p2"
+  ROOT_PART="${TARGET_DRIVE}p3"
 else
-    EFI_PART="${TARGET_DRIVE}2"
-    ROOT_PART="${TARGET_DRIVE}3"
+  EFI_PART="${TARGET_DRIVE}2"
+  ROOT_PART="${TARGET_DRIVE}3"
 fi
 
 echo "Formatting partitions..."
@@ -125,20 +128,43 @@ mount -o "$MNT_OPTS,subvol=@pkg" "$ROOT_PART" /mnt/var/cache/pacman/pkg
 # Mount the EFI partition
 mount "$EFI_PART" /mnt/boot
 
-# --- 4. The Pacstrap ---
-echo "Updating Arch Keyring to prevent package installation failures..."
-pacman -Sy archlinux-keyring --noconfirm
+# --- 3.5. Configure Repositories (ZypherOS Sync) ---
+echo "Configuring package repositories for synchronized install..."
 
+# 1. Enable Multilib
+sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
+
+# 2. Set Local Mirror as Priority #1
+if ! head -n 5 /etc/pacman.d/mirrorlist | grep -q "repo.zyphersystems.com"; then
+  sed -i '1i Server = https://repo.zyphersystems.com/mirror/$repo/os/$arch\n' /etc/pacman.d/mirrorlist
+fi
+
+# 3. Add Custom Zypher_OS Repository
+if ! grep -q "^\[zypheros\]" /etc/pacman.conf; then
+  cat <<'EOF' >>/etc/pacman.conf
+
+[zypheros]
+SigLevel = Optional TrustAll
+Server = https://repo.zyphersystems.com/zypheros/$arch
+EOF
+fi
+
+# 4. Refresh Package Databases
+echo "Synchronizing package databases with ZypherOS repos..."
+pacman -Sy archlinux-keyring --noconfirm
+pacman -Syy --noconfirm
+
+# --- 4. The Pacstrap ---
 echo "Installing base system and ZypherOS dependencies..."
 pacstrap -K /mnt base base-devel linux linux-firmware btrfs-progs sudo networkmanager neovim git plasma sddm limine snapper efibootmgr mtools konsole dolphin ark spectacle kate pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil noto-fonts noto-fonts-emoji $GPU_PKG
 
 echo "Generating fstab..."
-genfstab -U /mnt >> /mnt/etc/fstab
+genfstab -U /mnt >>/mnt/etc/fstab
 
 # --- 5. The Chroot Handoff ---
 echo "Generating internal configuration script..."
 
-cat <<EOF > /mnt/zypher_chroot.sh
+cat <<EOF >/mnt/zypher_chroot.sh
 #!/bin/bash
 # Set Hostname and Timezone
 echo "$HOSTNAME" > /etc/hostname
@@ -205,5 +231,26 @@ umount -R /mnt
 
 echo "========================================="
 echo " ZypherOS Base Installation Complete! "
-echo " You can now type 'reboot'."
 echo "========================================="
+echo "The system will reboot automatically."
+echo "Press any key to cancel..."
+
+CANCELED=false
+for i in {5..1}; do
+  echo -ne "\rRebooting in $i seconds... "
+  # Wait 1 second for a single keypress directly from the terminal
+  if read -t 1 -n 1 -s </dev/tty; then
+    CANCELED=true
+    break
+  fi
+done
+
+echo "" # Print a newline so the prompt doesn't overwrite the countdown
+
+if [ "$CANCELED" = true ]; then
+  echo "Auto-reboot canceled. You are still in the live environment."
+  echo "Type 'reboot' when you are ready."
+else
+  echo "Rebooting now!"
+  reboot
+fi
