@@ -489,23 +489,29 @@ cp /tmp/zypher_os_repo/images/zypher_os_wallpaper.png /usr/share/zypheros/brandi
 cp /tmp/zypher_os_repo/images/zypher_os_launcher_icon.png /usr/share/zypheros/branding/icon.png
 rm -rf /tmp/zypher_os_repo
 
-echo "Generating Dynamic ASCII Fastfetch Logo..."
-echo -e "\033[1;36m@@@@@@@@@@@@@@@@@@@" > /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m@:::::::::::::::::@" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m@:::::::::::::::::@" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m@:::@@@@@@@@:::::@" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m@@@@@    Z:::::S" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m        Y:::::Y" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m       P:::::S" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m      H:::::T\033[1;35m" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m     E:::::E" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m    R:::::M" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m   @:::::S" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m@@@:::::@     @@@@@" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m@::::::@@@@@@@@:::@" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m@:::::::::::::::::@" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m@:::::::::::::::::@" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m@@@@@@@@@@@@@@@@@@@\033[0m" >> /usr/share/zypheros/branding/logo.txt
+echo "Generating Dynamic Upscaled ASCII Fastfetch Logo..."
+echo -e "\033[1;36m---------------------------------------" > /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m|@@:::::::::::::::::::::::::::::::::@@@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m|-------------------------Z:::::::::S" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                         /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                        Y:::::::::Y" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                       /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                      P:::::::::S" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                     /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                    H:::::::::T\033[1;35m" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m                   /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m                  E:::::::::E" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m                 /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m                R:::::::::M" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m               /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m              /:::::::::S" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m--------------:::::::::::--------------" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m|@@:::::::::::::::::::::::::::::::::@@|" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m---------------------------------------\033[0m" >> /usr/share/zypheros/branding/logo.txt
 
 echo "Configuring SDDM Login Screen background and themes..."
 mkdir -p /etc/sddm.conf.d
