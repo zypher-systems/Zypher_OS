@@ -159,7 +159,7 @@ echo "Preparing ZypherOS package lists..."
 
 ZYPHER_PACKAGES=(
   # Base System & Hardware
-  base base-devel linux linux-firmware btrfs-progs sudo networkmanager
+  base base-devel linux linux-lts linux-firmware btrfs-progs sudo networkmanager
   $GPU_PKG
 
   # Bootloader & Snapshots
@@ -232,10 +232,18 @@ cp /usr/share/limine/limine-bios.sys /boot/
 # Write the custom Limine Config securely
 echo "timeout: 5" > /boot/limine.conf
 echo "" >> /boot/limine.conf
+
 echo "/ZypherOS" >> /boot/limine.conf
 echo "    protocol: linux" >> /boot/limine.conf
 echo "    kernel_path: boot():/vmlinuz-linux" >> /boot/limine.conf
 echo "    module_path: boot():/initramfs-linux.img" >> /boot/limine.conf
+echo "    cmdline: root=UUID=\$(blkid -s UUID -o value $ROOT_PART) rootflags=subvol=@ rw" >> /boot/limine.conf
+echo "" >> /boot/limine.conf
+
+echo "/ZypherOS (LTS Kernel)" >> /boot/limine.conf
+echo "    protocol: linux" >> /boot/limine.conf
+echo "    kernel_path: boot():/vmlinuz-linux-lts" >> /boot/limine.conf
+echo "    module_path: boot():/initramfs-linux-lts.img" >> /boot/limine.conf
 echo "    cmdline: root=UUID=\$(blkid -s UUID -o value $ROOT_PART) rootflags=subvol=@ rw" >> /boot/limine.conf
 
 # Detect Firmware and Install Bootloader Accordingly
