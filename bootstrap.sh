@@ -449,38 +449,6 @@ SKEL
 
 echo "TERMINAL=ghostty" >> /mnt/etc/environment
 
-# --- 4.6. ZypherOS Visual Branding Deployment ---
-echo "Staging invisible first-boot branding script..."
-mkdir -p /mnt/etc/skel/.config/autostart
-mkdir -p /mnt/etc/skel/.local/bin
-
-cat <<'EOF' > /mnt/etc/skel/.local/bin/zypher-branding.sh
-#!/bin/bash
-# Wait 10 seconds for Plasma 6 (Wayland) to fully initialize
-# The previous 3-second delay was too short for Virtual Machine graphics drivers
-sleep 10
-
-# Apply Wallpaper
-plasma-apply-wallpaperimage /usr/share/zypheros/branding/wallpaper.png
-
-# Clean up so this script never runs again
-rm "$HOME/.config/autostart/zypher-branding.desktop"
-rm "$HOME/.local/bin/zypher-branding.sh"
-EOF
-
-# Make the script executable
-chmod +x /mnt/etc/skel/.local/bin/zypher-branding.sh
-
-# Create the Autostart trigger
-cat <<'AUTOSTART' > /mnt/etc/skel/.config/autostart/zypher-branding.desktop
-[Desktop Entry]
-Type=Application
-Name=ZypherOS Branding Apply
-Exec=bash -c "$HOME/.local/bin/zypher-branding.sh"
-X-KDE-autostart-condition=
-AUTOSTART
-
-
 # --- 5. The Chroot Handoff ---
 echo "Generating internal configuration script..."
 
@@ -493,7 +461,7 @@ sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
-# --- Branding Assets Deployment ---
+# --- BRANDING ASSET DEPLOYMENT (MUST RUN BEFORE USERADD) ---
 echo "Cloning ZypherOS repository for branding assets..."
 mkdir -p /usr/share/zypheros/branding
 git clone https://github.com/zypher-systems/Zypher_OS.git /tmp/zypher_os_repo
@@ -501,44 +469,85 @@ cp /tmp/zypher_os_repo/images/zypher_os_wallpaper.png /usr/share/zypheros/brandi
 cp /tmp/zypher_os_repo/images/zypher_os_launcher_icon.png /usr/share/zypheros/branding/icon.png
 rm -rf /tmp/zypher_os_repo
 
-echo "Configuring User Local Assets (.local/share/zypher)..."
-# We must do this in /etc/skel so it replicates to the user automatically
-mkdir -p /etc/skel/.local/share/zypher/branding
-cp /usr/share/zypheros/branding/wallpaper.png /etc/skel/.local/share/zypher/branding/wallpaper.png
-cp /usr/share/zypheros/branding/icon.png /etc/skel/.local/share/zypher/branding/icon.png
-
-echo "Configuring Plasma Launcher Icon (Force Method)..."
-# We copy the system widget to the user's local path and patch the metadata directly.
-# This bypasses the icon cache and works on first boot without DBus scripting.
-mkdir -p /etc/skel/.local/share/plasma/plasmoids
-cp -r /usr/share/plasma/plasmoids/org.kde.plasma.kickoff /etc/skel/.local/share/plasma/plasmoids/
-sed -i 's|"Icon": ".*"|"Icon": "/usr/share/zypheros/branding/icon.png"|' /etc/skel/.local/share/plasma/plasmoids/org.kde.plasma.kickoff/metadata.json
-
 echo "Configuring SDDM Login Screen background and themes..."
 mkdir -p /etc/sddm.conf.d
 echo -e "[General]\nNumlock=on" > /etc/sddm.conf.d/numlock.conf
 echo -e "[Theme]\nCurrent=breeze" > /etc/sddm.conf.d/10-theme.conf
 
-# Map the SDDM background to the ZypherOS Wallpaper
 mkdir -p /usr/share/sddm/themes/breeze
 cat <<'THEME' > /usr/share/sddm/themes/breeze/theme.conf.user
 [General]
 background=/usr/share/zypheros/branding/wallpaper.png
 THEME
 
+echo "Staging Personal User Branding Assets (.local)..."
+# Because we do this BEFORE useradd, they perfectly snapshot into the new user's home folder
+mkdir -p /etc/skel/.local/share/zypher/branding
+cp /usr/share/zypheros/branding/wallpaper.png /etc/skel/.local/share/zypher/branding/wallpaper.png
+cp /usr/share/zypheros/branding/icon.png /etc/skel/.local/share/zypher/branding/icon.png
+
+echo "Staging bulletproof DBus branding script for first login..."
+mkdir -p /etc/skel/.local/bin
+mkdir -p /etc/skel/.config/autostart
+
+# This script intelligently waits for DBus instead of failing on slow VMs
+cat <<'SKELSCRIPT' > /etc/skel/.local/bin/zypher-branding.sh
+#!/bin/bash
+export DBUS_SESSION_BUS_ADDRESS="unix:path=\$XDG_RUNTIME_DIR/bus"
+
+# Actively poll the DBus until the Plasma desktop engine comes online
+until qdbus6 org.kde.plasmashell /PlasmaShell >/dev/null 2>&1; do
+    sleep 2
+done
+
+# Give Wayland graphics an extra 5 seconds to fully draw the desktop
+sleep 5
+
+plasma-apply-wallpaperimage "\$HOME/.local/share/zypher/branding/wallpaper.png"
+
+qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
+    var p = panels();
+    for (var i=0; i<p.length; ++i) {
+        var w = p[i].widgets();
+        for (var j=0; j<w.length; ++j) {
+            if (w[j].type === 'org.kde.plasma.kickoff') {
+                w[j].currentConfigGroup = ['General'];
+                w[j].writeConfig('icon', '\$HOME/.local/share/zypher/branding/icon.png');
+            }
+        }
+    }
+"
+
+rm -f "\$HOME/.config/autostart/zypher-branding.desktop"
+SKELSCRIPT
+
+chmod +x /etc/skel/.local/bin/zypher-branding.sh
+
+cat <<'SKELAUTO' > /etc/skel/.config/autostart/zypher-branding.desktop
+[Desktop Entry]
+Type=Application
+Name=ZypherOS Branding Apply
+Exec=/bin/bash -c "\$HOME/.local/bin/zypher-branding.sh"
+X-KDE-autostart-condition=
+SKELAUTO
+
 echo "Cloning LazyVim profile..."
 git clone https://github.com/zypher-systems/nvim-config.git /etc/skel/.config/nvim
 rm -rf /etc/skel/.config/nvim/.git
 
-# Create User
+# ==========================================
+# Create User (SNAPSHOTS ALL OF THE ABOVE)
+# ==========================================
 useradd -m -G wheel -s /usr/bin/fish $USERNAME
 echo "$USERNAME:$PASSWORD" | chpasswd
 echo "root:$PASSWORD" | chpasswd
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
+# Map the global KDE theme file so the SDDM user matches the desktop theme
+mkdir -p /var/lib/sddm/.config
+cp /etc/skel/.config/kdeglobals /var/lib/sddm/.config/kdeglobals
 chown -R sddm:sddm /var/lib/sddm/.config
 
-# (Updated to use sudo -u to match the safe builduser method)
 echo "Bootstrapping Neovim plugins for \$USERNAME..."
 sudo -u "\$USERNAME" nvim --headless "+Lazy! sync" +qa >/dev/null 2>&1 || true
 
