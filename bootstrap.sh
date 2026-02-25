@@ -456,6 +456,22 @@ echo -e "[Theme]\nCurrent=breeze" > /mnt/etc/sddm.conf.d/10-theme.conf
 mkdir -p /mnt/var/lib/sddm/.config
 cp /mnt/etc/skel/.config/kdeglobals /mnt/var/lib/sddm/.config/kdeglobals
 
+# --- 4.6. ZypherOS Branding & Assets ---
+echo "Configuring Plasma Launcher Icon..."
+mkdir -p /mnt/etc/skel/.local/share/plasma/plasmoids
+cp -r /mnt/usr/share/plasma/plasmoids/org.kde.plasma.kickoff /mnt/etc/skel/.local/share/plasma/plasmoids/
+sed -i 's|"Icon": ".*"|"Icon": "/usr/share/zypheros/branding/icon.png"|' /mnt/etc/skel/.local/share/plasma/plasmoids/org.kde.plasma.kickoff/metadata.json
+
+echo "Staging invisible first-boot wallpaper script..."
+mkdir -p /mnt/etc/skel/.config/autostart
+cat <<'AUTOSTART' > /mnt/etc/skel/.config/autostart/zypher-wallpaper.desktop
+[Desktop Entry]
+Type=Application
+Name=Zypher Wallpaper Apply
+Exec=sh -c "plasma-apply-wallpaperimage /usr/share/zypheros/branding/wallpaper.png && rm ~/.config/autostart/zypher-wallpaper.desktop"
+X-KDE-autostart-condition=
+AUTOSTART
+
 
 # --- 5. The Chroot Handoff ---
 echo "Generating internal configuration script..."
@@ -468,6 +484,13 @@ hwclock --systohc
 sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
+
+echo "Cloning ZypherOS repository for branding assets..."
+mkdir -p /usr/share/zypheros/branding
+git clone https://github.com/zypher-systems/Zypher_OS.git /tmp/zypher_os_repo
+cp /tmp/zypher_os_repo/images/zypher_os_wallpaper.png /usr/share/zypheros/branding/wallpaper.png
+cp /tmp/zypher_os_repo/images/zypher_os_launcher_icon.png /usr/share/zypheros/branding/icon.png
+rm -rf /tmp/zypher_os_repo
 
 echo "Cloning LazyVim profile..."
 git clone https://github.com/zypher-systems/nvim-config.git /etc/skel/.config/nvim
