@@ -449,26 +449,47 @@ SKEL
 
 echo "TERMINAL=ghostty" >> /mnt/etc/environment
 
-mkdir -p /mnt/etc/sddm.conf.d
-echo -e "[General]\nNumlock=on" > /mnt/etc/sddm.conf.d/numlock.conf
-echo -e "[Theme]\nCurrent=breeze" > /mnt/etc/sddm.conf.d/10-theme.conf
-
-mkdir -p /mnt/var/lib/sddm/.config
-cp /mnt/etc/skel/.config/kdeglobals /mnt/var/lib/sddm/.config/kdeglobals
-
-# --- 4.6. ZypherOS Branding & Assets ---
-echo "Configuring Plasma Launcher Icon..."
-mkdir -p /mnt/etc/skel/.local/share/plasma/plasmoids
-cp -r /mnt/usr/share/plasma/plasmoids/org.kde.plasma.kickoff /mnt/etc/skel/.local/share/plasma/plasmoids/
-sed -i 's|"Icon": ".*"|"Icon": "/usr/share/zypheros/branding/icon.png"|' /mnt/etc/skel/.local/share/plasma/plasmoids/org.kde.plasma.kickoff/metadata.json
-
-echo "Staging invisible first-boot wallpaper script..."
+# --- 4.6. ZypherOS Visual Branding Deployment ---
+echo "Staging invisible first-boot branding script..."
 mkdir -p /mnt/etc/skel/.config/autostart
-cat <<'AUTOSTART' > /mnt/etc/skel/.config/autostart/zypher-wallpaper.desktop
+mkdir -p /mnt/etc/skel/.local/bin
+
+cat <<'EOF' > /mnt/etc/skel/.local/bin/zypher-branding.sh
+#!/bin/bash
+# Wait for Plasma to fully initialize
+sleep 3
+
+# Apply Wallpaper
+plasma-apply-wallpaperimage /usr/share/zypheros/branding/wallpaper.png
+
+# Inject new icon directly into the running Plasma taskbar using KDE Scripting
+qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
+var p = panels();
+for (var i=0; i<p.length; ++i) {
+    var w = p[i].widgets();
+    for (var j=0; j<w.length; ++j) {
+        if (w[j].type === 'org.kde.plasma.kickoff') {
+            w[j].currentConfigGroup = ['General'];
+            w[j].writeConfig('icon', '/usr/share/zypheros/branding/icon.png');
+        }
+    }
+}
+"
+
+# Clean up so this script never runs again
+rm "$HOME/.config/autostart/zypher-branding.desktop"
+rm "$HOME/.local/bin/zypher-branding.sh"
+EOF
+
+# Make the script executable
+chmod +x /mnt/etc/skel/.local/bin/zypher-branding.sh
+
+# Create the Autostart trigger
+cat <<'AUTOSTART' > /mnt/etc/skel/.config/autostart/zypher-branding.desktop
 [Desktop Entry]
 Type=Application
-Name=Zypher Wallpaper Apply
-Exec=sh -c "plasma-apply-wallpaperimage /usr/share/zypheros/branding/wallpaper.png && rm ~/.config/autostart/zypher-wallpaper.desktop"
+Name=ZypherOS Branding Apply
+Exec=bash -c "$HOME/.local/bin/zypher-branding.sh"
 X-KDE-autostart-condition=
 AUTOSTART
 
@@ -492,6 +513,18 @@ cp /tmp/zypher_os_repo/images/zypher_os_wallpaper.png /usr/share/zypheros/brandi
 cp /tmp/zypher_os_repo/images/zypher_os_launcher_icon.png /usr/share/zypheros/branding/icon.png
 rm -rf /tmp/zypher_os_repo
 
+echo "Configuring SDDM Login Screen background and themes..."
+mkdir -p /etc/sddm.conf.d
+echo -e "[General]\nNumlock=on" > /etc/sddm.conf.d/numlock.conf
+echo -e "[Theme]\nCurrent=breeze" > /etc/sddm.conf.d/10-theme.conf
+
+# Map the SDDM background to the ZypherOS Wallpaper
+mkdir -p /usr/share/sddm/themes/breeze
+cat <<'THEME' > /usr/share/sddm/themes/breeze/theme.conf.user
+[General]
+background=/usr/share/zypheros/branding/wallpaper.png
+THEME
+
 echo "Cloning LazyVim profile..."
 git clone https://github.com/zypher-systems/nvim-config.git /etc/skel/.config/nvim
 rm -rf /etc/skel/.config/nvim/.git
@@ -502,20 +535,20 @@ echo "$USERNAME:$PASSWORD" | chpasswd
 echo "root:$PASSWORD" | chpasswd
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
+# Stage the global dark mode config for the SDDM background user
+mkdir -p /var/lib/sddm/.config
+cp /etc/skel/.config/kdeglobals /var/lib/sddm/.config/kdeglobals
 chown -R sddm:sddm /var/lib/sddm/.config
 
-# (Updated to use sudo -u to match the safe builduser method)
 echo "Bootstrapping Neovim plugins for \$USERNAME..."
 sudo -u "\$USERNAME" nvim --headless "+Lazy! sync" +qa >/dev/null 2>&1 || true
 
 # --- Install yay (AUR Helper) ---
 echo "Installing yay (AUR Helper)..."
-# Explicitly assign bash to avoid any fish shell environment issues
 useradd -m -s /bin/bash builduser
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 chmod 440 /etc/sudoers.d/builduser
 
-# Execute as builduser directly without spawning a login shell
 sudo -u builduser git clone https://aur.archlinux.org/yay-bin.git /home/builduser/yay-bin
 sudo -u builduser bash -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm"
 
