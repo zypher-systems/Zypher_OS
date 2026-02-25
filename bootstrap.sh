@@ -461,7 +461,7 @@ sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
-# --- BRANDING ASSET DEPLOYMENT (MUST RUN BEFORE USERADD) ---
+# --- BRANDING ASSET DEPLOYMENT ---
 echo "Cloning ZypherOS repository for branding assets..."
 mkdir -p /usr/share/zypheros/branding
 git clone https://github.com/zypher-systems/Zypher_OS.git /tmp/zypher_os_repo
@@ -481,55 +481,10 @@ background=/usr/share/zypheros/branding/wallpaper.png
 THEME
 
 echo "Staging Personal User Branding Assets (.local)..."
-# Because we do this BEFORE useradd, they perfectly snapshot into the new user's home folder
+# Placed in /etc/skel so they perfectly snapshot into the new user's home folder
 mkdir -p /etc/skel/.local/share/zypher/branding
 cp /usr/share/zypheros/branding/wallpaper.png /etc/skel/.local/share/zypher/branding/wallpaper.png
 cp /usr/share/zypheros/branding/icon.png /etc/skel/.local/share/zypher/branding/icon.png
-
-echo "Staging bulletproof DBus branding script for first login..."
-mkdir -p /etc/skel/.local/bin
-mkdir -p /etc/skel/.config/autostart
-
-# This script intelligently waits for DBus instead of failing on slow VMs
-cat <<'SKELSCRIPT' > /etc/skel/.local/bin/zypher-branding.sh
-#!/bin/bash
-export DBUS_SESSION_BUS_ADDRESS="unix:path=\$XDG_RUNTIME_DIR/bus"
-
-# Actively poll the DBus until the Plasma desktop engine comes online
-until qdbus6 org.kde.plasmashell /PlasmaShell >/dev/null 2>&1; do
-    sleep 2
-done
-
-# Give Wayland graphics an extra 5 seconds to fully draw the desktop
-sleep 5
-
-plasma-apply-wallpaperimage "\$HOME/.local/share/zypher/branding/wallpaper.png"
-
-qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
-    var p = panels();
-    for (var i=0; i<p.length; ++i) {
-        var w = p[i].widgets();
-        for (var j=0; j<w.length; ++j) {
-            if (w[j].type === 'org.kde.plasma.kickoff') {
-                w[j].currentConfigGroup = ['General'];
-                w[j].writeConfig('icon', '\$HOME/.local/share/zypher/branding/icon.png');
-            }
-        }
-    }
-"
-
-rm -f "\$HOME/.config/autostart/zypher-branding.desktop"
-SKELSCRIPT
-
-chmod +x /etc/skel/.local/bin/zypher-branding.sh
-
-cat <<'SKELAUTO' > /etc/skel/.config/autostart/zypher-branding.desktop
-[Desktop Entry]
-Type=Application
-Name=ZypherOS Branding Apply
-Exec=/bin/bash -c "\$HOME/.local/bin/zypher-branding.sh"
-X-KDE-autostart-condition=
-SKELAUTO
 
 echo "Cloning LazyVim profile..."
 git clone https://github.com/zypher-systems/nvim-config.git /etc/skel/.config/nvim
@@ -542,6 +497,65 @@ useradd -m -G wheel -s /usr/bin/fish $USERNAME
 echo "$USERNAME:$PASSWORD" | chpasswd
 echo "root:$PASSWORD" | chpasswd
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
+
+# --- POST-USERADD ABSOLUTE SCRIPT INJECTION ---
+echo "Staging bulletproof hardcoded DBus script for first login..."
+mkdir -p /home/$USERNAME/.local/bin
+mkdir -p /home/$USERNAME/.config/autostart
+
+# Write the script using a placeholder (ZYPHERUSER) to avoid variable escaping madness
+cat <<'BRANDSCRIPT' > /home/$USERNAME/.local/bin/zypher-branding.sh
+#!/bin/bash
+exec > "/home/ZYPHERUSER/zypher-branding.log" 2>&1
+echo "Waiting for Plasma DBus to initialize..."
+
+until qdbus6 org.kde.plasmashell /PlasmaShell >/dev/null 2>&1; do
+    sleep 2
+done
+
+echo "DBus found. Waiting 5s for Wayland desktop rendering..."
+sleep 5
+
+echo "Applying Wallpaper..."
+plasma-apply-wallpaperimage "/home/ZYPHERUSER/.local/share/zypher/branding/wallpaper.png"
+
+echo "Applying Launcher Icon..."
+qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
+    var p = panels();
+    for (var i=0; i<p.length; ++i) {
+        var w = p[i].widgets();
+        for (var j=0; j<w.length; ++j) {
+            if (w[j].type === 'org.kde.plasma.kickoff') {
+                w[j].currentConfigGroup = ['General'];
+                w[j].writeConfig('icon', '/home/ZYPHERUSER/.local/share/zypher/branding/icon.png');
+            }
+        }
+    }
+"
+
+echo "Success! Cleaning up autostart script..."
+rm -f "/home/ZYPHERUSER/.config/autostart/zypher-branding.desktop"
+# We leave this script and the .log file behind on purpose so you can check for errors!
+BRANDSCRIPT
+
+# Safely swap the placeholder for the real username
+sed -i "s/ZYPHERUSER/$USERNAME/g" /home/$USERNAME/.local/bin/zypher-branding.sh
+chmod +x /home/$USERNAME/.local/bin/zypher-branding.sh
+
+cat <<'BRANDAUTO' > /home/$USERNAME/.config/autostart/zypher-branding.desktop
+[Desktop Entry]
+Type=Application
+Name=ZypherOS Branding Apply
+Exec=/home/ZYPHERUSER/.local/bin/zypher-branding.sh
+X-KDE-autostart-condition=
+BRANDAUTO
+
+sed -i "s/ZYPHERUSER/$USERNAME/g" /home/$USERNAME/.config/autostart/zypher-branding.desktop
+
+# Ensure the user owns these new files
+chown -R $USERNAME:$USERNAME /home/$USERNAME/.local/bin/zypher-branding.sh
+chown -R $USERNAME:$USERNAME /home/$USERNAME/.config/autostart/zypher-branding.desktop
+# ==========================================
 
 # Map the global KDE theme file so the SDDM user matches the desktop theme
 mkdir -p /var/lib/sddm/.config
