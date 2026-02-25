@@ -6,17 +6,17 @@ v0.1.0 - Arch release
 
 For this early build of ZyherOS I am at the stage where its a bootstrap script.  The process for installing zypherOS v0.1.0 is below:
 
-1.) Download the official Arch Linux ISO.
-2.) Boot into the Arch Linux ISO.
-3.) When you get to the live iso command line prompt, simply run the following command:
+* Download the official Arch Linux ISO.
+* Boot into the Arch Linux ISO.
+* When you get to the live iso command line prompt, simply run the following command:
   curl -fsSL https://zyphersystems.com/bootstrap | sh 
 
 When you run this command it will prompt you to answer a few questions.  Those questions are below:
 
-1.) Select drive.  (Curently ZypherOS will use the entire drive that you select.  There are plans in the future to add custom partitioning but as of now that option is not available.)
-2.) Username
-3.) Password
-4.) Confirm Password
-5.) Hostname
-6.) Video driver selection (This is a temporary step for testing.  I plan to automate this by greping lspci in a future update.)
-7.) Confirm drive format. (This option requires a capital YES.  Anything other that YES in all caps will cause the script to fail back to the command line.)
+* Select drive.  (Curently ZypherOS will use the entire drive that you select.  There are plans in the future to add custom partitioning but as of now that option is not available.)
+* Username
+* Password
+* Confirm Password
+* Hostname
+* Video driver selection (This is a temporary step for testing.  I plan to automate this by greping lspci in a future update.)
+* Confirm drive format. (This option requires a capital YES.  Anything other that YES in all caps will cause the script to fail back to the command line.)
