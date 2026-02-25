@@ -481,16 +481,20 @@ sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
 chown -R sddm:sddm /var/lib/sddm/.config
 
+# (Updated to use sudo -u to match the safe builduser method)
 echo "Bootstrapping Neovim plugins for \$USERNAME..."
-su - "\$USERNAME" -c "nvim --headless '+Lazy! sync' +qa >/dev/null 2>&1" || true
+sudo -u "\$USERNAME" nvim --headless "+Lazy! sync" +qa >/dev/null 2>&1 || true
 
 # --- Install yay (AUR Helper) ---
 echo "Installing yay (AUR Helper)..."
-useradd -m builduser
+# Explicitly assign bash to avoid any fish shell environment issues
+useradd -m -s /bin/bash builduser
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
+chmod 440 /etc/sudoers.d/builduser
 
-su - builduser -c "git clone https://aur.archlinux.org/yay-bin.git /home/builduser/yay-bin"
-su - builduser -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm"
+# Execute as builduser directly without spawning a login shell
+sudo -u builduser git clone https://aur.archlinux.org/yay-bin.git /home/builduser/yay-bin
+sudo -u builduser bash -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm"
 
 rm /etc/sudoers.d/builduser
 userdel -r builduser
