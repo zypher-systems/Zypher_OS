@@ -155,8 +155,36 @@ pacman -Sy archlinux-keyring --noconfirm
 pacman -Syy --noconfirm
 
 # --- 4. The Pacstrap ---
+echo "Preparing ZypherOS package lists..."
+
+ZYPHER_PACKAGES=(
+  # Base System & Hardware
+  base base-devel linux linux-firmware btrfs-progs sudo networkmanager
+  $GPU_PKG
+
+  # Bootloader & Snapshots
+  limine snapper efibootmgr mtools
+
+  # Desktop Environment & Audio/Bluetooth
+  plasma sddm pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil
+
+  # KDE Core Apps
+  konsole dolphin ark spectacle kate gwenview okular partitionmanager
+
+  # CLI Utilities & Core Tools
+  git fastfetch fish neovim starship zoxide thefuck eza bat btop
+  lazygit ripgrep fd unzip wget xclip wl-clipboard
+
+  # Productivity & Creation Apps
+  ghostty gimp blender inkscape libreoffice-fresh pika-backup
+  obs-studio flatpak kdenlive thunderbird
+
+  # Fonts
+  ttf-meslo-nerd noto-fonts noto-fonts-emoji
+)
+
 echo "Installing base system and ZypherOS dependencies..."
-pacstrap -K /mnt base base-devel linux linux-firmware btrfs-progs sudo networkmanager neovim git plasma sddm limine snapper efibootmgr mtools konsole dolphin ark spectacle kate pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil noto-fonts noto-fonts-emoji $GPU_PKG
+pacstrap -K /mnt "${ZYPHER_PACKAGES[@]}"
 
 echo "Generating fstab..."
 genfstab -U /mnt >>/mnt/etc/fstab
