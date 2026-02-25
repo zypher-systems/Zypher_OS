@@ -1,122 +1,81 @@
 #!/bin/bash
 set -e
 
-echo "========================================="
-echo "   ZypherOS Installer - Alpha Release    "
-echo "========================================="
-
 # --- 0. Firmware Check for User Awareness ---
 if [ ! -d "/sys/firmware/efi" ]; then
-  echo "Notice: Booted in Legacy BIOS (SeaBIOS) mode. Proceeding with hybrid MBR/GPT install."
+  FIRMWARE_MSG="Notice: Booted in Legacy BIOS (SeaBIOS) mode. Proceeding with hybrid MBR/GPT install."
 else
-  echo "Notice: Booted in UEFI mode. Proceeding with standard EFI install."
+  FIRMWARE_MSG="Notice: Booted in UEFI mode. Proceeding with standard EFI install."
 fi
-echo ""
 
-# --- 1. The Interview ---
-echo "Available Drives:"
-mapfile -t DRIVE_ARRAY < <(lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop" | grep -v "rom")
+whiptail --title "ZypherOS Installer - Alpha Release" --msgbox "Welcome to the ZypherOS Installer.\n\n$FIRMWARE_MSG\n\nPress Enter to begin the setup process." 12 60
 
-for i in "${!DRIVE_ARRAY[@]}"; do
-  echo "  $((i + 1))) ${DRIVE_ARRAY[$i]}"
-done
-echo ""
+# --- 1. The Interview (TUI) ---
 
+# Drive Selection
+DRIVE_OPTIONS=()
+while read -r name size model; do
+    DRIVE_OPTIONS+=("$name" "$model ($size)")
+done < <(lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop" | grep -v "rom")
+
+TARGET_DRIVE=$(whiptail --title "Target Drive Configuration" --menu "Choose the drive to install ZypherOS on:\nWARNING: ALL DATA ON THIS DRIVE WILL BE WIPED!" 15 65 5 "${DRIVE_OPTIONS[@]}" 3>&1 1>&2 2>&3)
+if [ -z "$TARGET_DRIVE" ]; then clear; echo "Installation canceled."; exit 1; fi
+
+# User Setup
+USERNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the desired username for the primary account:" 10 60 "Dusty" 3>&1 1>&2 2>&3)
+if [ -z "$USERNAME" ]; then clear; echo "Installation canceled."; exit 1; fi
+
+# Password Setup
 while true; do
-  read -p "Select the number of the target drive (1-${#DRIVE_ARRAY[@]}): " DRIVE_NUM </dev/tty
-  if [[ "$DRIVE_NUM" =~ ^[0-9]+$ ]] && [ "$DRIVE_NUM" -ge 1 ] && [ "$DRIVE_NUM" -le "${#DRIVE_ARRAY[@]}" ]; then
-    TARGET_DRIVE=$(echo "${DRIVE_ARRAY[$((DRIVE_NUM - 1))]}" | awk '{print $1}')
-    echo "Selected target: $TARGET_DRIVE"
-    break
-  else
-    echo "Invalid selection. Please pick a number from the list."
+  PASSWORD=$(whiptail --title "Security Setup" --passwordbox "Enter the password for $USERNAME (This will also be the Root password):" 10 60 3>&1 1>&2 2>&3)
+  PASSWORD_CONFIRM=$(whiptail --title "Security Setup" --passwordbox "Confirm your password:" 10 60 3>&1 1>&2 2>&3)
+  
+  if [ "$PASSWORD" == "$PASSWORD_CONFIRM" ] && [ -n "$PASSWORD" ]; then 
+      break
+  else 
+      whiptail --title "Error" --msgbox "Passwords do not match or are empty. Please try again." 10 60
   fi
 done
 
-echo ""
-read -p "Enter desired username: " USERNAME </dev/tty
+# Hostname Setup
+HOSTNAME=$(whiptail --title "Network Setup" --inputbox "Enter the system hostname (Computer Name):" 10 60 "zypheros" 3>&1 1>&2 2>&3)
+if [ -z "$HOSTNAME" ]; then clear; echo "Installation canceled."; exit 1; fi
 
-while true; do
-  read -sp "Enter password for $USERNAME (and Root): " PASSWORD </dev/tty
-  echo ""
-  read -sp "Confirm password: " PASSWORD_CONFIRM </dev/tty
-  echo ""
-  if [ "$PASSWORD" == "$PASSWORD_CONFIRM" ]; then
-    echo "Passwords match."
-    break
-  else
-    echo "Error: Passwords do not match. Please try again."
-  fi
-done
-
-echo ""
-read -p "Enter system hostname: " HOSTNAME </dev/tty
-echo ""
-
-# --- Smart GPU Auto-Detection ---
-echo "Detecting Graphics Hardware..."
-# Query PCI devices for VGA or 3D controllers and grab the first matching vendor
+# Smart GPU Auto-Detect
 GPU_VENDOR=$(lspci -vnn | grep -iE 'VGA|3D' | grep -iE 'NVIDIA|AMD|Advanced Micro Devices|Intel' | head -n 1)
+if echo "$GPU_VENDOR" | grep -iq "NVIDIA"; then DETECTED="NVIDIA"; DEFAULT="2";
+elif echo "$GPU_VENDOR" | grep -iqE "AMD|Advanced Micro Devices"; then DETECTED="AMD"; DEFAULT="1";
+elif echo "$GPU_VENDOR" | grep -iq "Intel"; then DETECTED="Intel"; DEFAULT="3";
+else DETECTED="Virtual Machine / Generic"; DEFAULT="4"; fi
 
-if echo "$GPU_VENDOR" | grep -iq "NVIDIA"; then
-  DETECTED_GPU="NVIDIA"
-  DEFAULT_GPU_PKG="nvidia nvidia-utils"
-elif echo "$GPU_VENDOR" | grep -iqE "AMD|Advanced Micro Devices"; then
-  DETECTED_GPU="AMD"
-  DEFAULT_GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode"
-elif echo "$GPU_VENDOR" | grep -iq "Intel"; then
-  DETECTED_GPU="Intel"
-  DEFAULT_GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode"
-else
-  DETECTED_GPU="Virtual Machine / Generic"
-  DEFAULT_GPU_PKG="mesa"
+GPU_CHOICE=$(whiptail --title "Graphics Drivers" --menu "Hardware Scan detected: $DETECTED\n\nPlease verify your graphics driver deployment:" 15 65 4 \
+"1" "AMD (Open Source) - Recommended" \
+"2" "NVIDIA (Proprietary)" \
+"3" "Intel" \
+"4" "Virtual Machine (QEMU/VMware/VirtIO)" \
+--default-item "$DEFAULT" 3>&1 1>&2 2>&3)
+
+if [ -z "$GPU_CHOICE" ]; then clear; echo "Installation canceled."; exit 1; fi
+
+case $GPU_CHOICE in
+  1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode" ;;
+  2) GPU_PKG="nvidia nvidia-utils" ;;
+  3) GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode" ;;
+  4) GPU_PKG="mesa" ;;
+esac
+
+# Final Point of No Return
+if ! whiptail --title "WARNING: DATA DESTRUCTION" --yesno "You are about to COMPLETELY WIPE the following drive:\n\n$TARGET_DRIVE\n\nAre you absolutely sure you want to proceed?" 12 60; then
+    clear
+    echo "Installation aborted by user."
+    exit 1
 fi
 
-echo "  -> $DETECTED_GPU GPU detected."
-echo ""
-echo "The installer will automatically proceed with the appropriate $DETECTED_GPU drivers."
-echo "Press any key within 5 seconds to manually override this selection..."
-
-OVERRIDE=false
-for i in {5..1}; do
-  echo -ne "\rAuto-selecting in $i seconds... "
-  if read -t 1 -n 1 -s </dev/tty; then
-    OVERRIDE=true
-    break
-  fi
-done
-echo ""
-
-if [ "$OVERRIDE" = true ]; then
-  echo ""
-  echo "--- Manual GPU Selection ---"
-  echo "  1) AMD (Open Source)"
-  echo "  2) NVIDIA (Proprietary)"
-  echo "  3) Intel"
-  echo "  4) Virtual Machine (QEMU/VMware)"
-  while true; do
-    read -p "Selection (1-4): " GPU_CHOICE </dev/tty
-    case $GPU_CHOICE in
-      1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode"; break ;;
-      2) GPU_PKG="nvidia nvidia-utils"; break ;;
-      3) GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode"; break ;;
-      4) GPU_PKG="mesa"; break ;;
-      *) echo "Invalid choice. Please select 1-4." ;;
-    esac
-  done
-else
-  GPU_PKG=$DEFAULT_GPU_PKG
-fi
-
-echo "Selected driver packages: $GPU_PKG"
-echo ""
-
-echo "WARNING: This will COMPLETELY WIPE $TARGET_DRIVE."
-read -p "Are you sure you want to continue? (Type YES to proceed): " CONFIRM </dev/tty
-if [ "$CONFIRM" != "YES" ]; then
-  echo "Aborting installation."
-  exit 1
-fi
+clear
+echo "========================================="
+echo "   Initiating ZypherOS Deployment...     "
+echo "========================================="
+sleep 2
 
 # --- 2. Universal Partitioning ---
 echo "Wiping and partitioning $TARGET_DRIVE..."
@@ -159,14 +118,10 @@ mount "$EFI_PART" /mnt/boot
 # --- 3.5. Optimize Live Environment for Speed ---
 echo "Optimizing Live Environment for maximum download speeds..."
 
-# Enable parallel downloads
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
-
-# Enable Multilib
 sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
 
 echo "Fetching Arch Linux Global CDN..."
-# Replace the live mirrorlist with the official geo-routed edge network
 echo 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' > /etc/pacman.d/mirrorlist
 
 echo "Synchronizing package databases..."
@@ -617,7 +572,7 @@ BRANDAUTO
 
 sed -i "s/ZYPHERUSER/$USERNAME/g" /home/$USERNAME/.config/autostart/zypher-branding.desktop
 
-# Fix directory and file permissions so the user can actually execute and delete them!
+# Fix directory and file permissions
 chown -R $USERNAME:$USERNAME /home/$USERNAME/.config
 chown -R $USERNAME:$USERNAME /home/$USERNAME/.local
 # ==========================================
@@ -690,6 +645,9 @@ arch-chroot /mnt /zypher_chroot.sh
 # --- 6. Clean Up ---
 rm /mnt/zypher_chroot.sh
 umount -R /mnt
+
+whiptail --title "Installation Complete" --msgbox "ZypherOS has been successfully installed!\n\nPress Enter to exit the installer and reboot." 10 60
+clear
 
 echo "========================================="
 echo " ZypherOS Base Installation Complete! "
