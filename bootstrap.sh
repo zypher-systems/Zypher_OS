@@ -117,22 +117,20 @@ mount -o "$MNT_OPTS,subvol=@log" "$ROOT_PART" /mnt/var/log
 mount -o "$MNT_OPTS,subvol=@pkg" "$ROOT_PART" /mnt/var/cache/pacman/pkg
 mount "$EFI_PART" /mnt/boot
 
-# --- 3.5. Configure Repositories ---
-echo "Configuring package repositories for synchronized install..."
+# --- 3.5. Optimize Live Environment for Speed ---
+echo "Optimizing Live Environment for maximum download speeds..."
+
+# Enable parallel downloads
+sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
+
+# Enable Multilib
 sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
-if ! head -n 5 /etc/pacman.d/mirrorlist | grep -q "repo.zyphersystems.com"; then
-  sed -i '1i Server = https://repo.zyphersystems.com/mirror/$repo/os/$arch\n' /etc/pacman.d/mirrorlist
-fi
-if ! grep -q "^\[zypheros\]" /etc/pacman.conf; then
-  cat <<'EOF' >>/etc/pacman.conf
 
-[zypheros]
-SigLevel = Optional TrustAll
-Server = https://repo.zyphersystems.com/zypheros/$arch
-EOF
-fi
+echo "Fetching fastest official global CDN mirrors..."
+# reflector is built into the Arch Live USB. We grab the 10 fastest mirrors available.
+reflector --latest 10 --sort rate --save /etc/pacman.d/mirrorlist || true
 
-echo "Synchronizing package databases with ZypherOS repos..."
+echo "Synchronizing package databases..."
 pacman -Sy archlinux-keyring --noconfirm
 pacman -Syy --noconfirm
 
@@ -142,7 +140,6 @@ echo "KEYMAP=us" > /mnt/etc/vconsole.conf
 
 # --- 4. The Pacstrap ---
 echo "Preparing ZypherOS package lists..."
-# Note: flatpak has been removed. Discord has been added natively.
 ZYPHER_PACKAGES=(
   base base-devel linux linux-lts linux-firmware btrfs-progs sudo networkmanager
   $GPU_PKG limine snapper efibootmgr mtools
@@ -164,7 +161,6 @@ echo "Staging system configurations and user dotfiles (/etc/skel)..."
 
 mkdir -p /mnt/etc/skel/.config/{ghostty/themes,fish,fastfetch,nvim,discord}
 
-# --- Discord Update Blocker Fix ---
 cat <<'SKEL' > /mnt/etc/skel/.config/discord/settings.json
 {
   "SKIP_HOST_UPDATE": true
@@ -468,6 +464,28 @@ hwclock --systohc
 sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
+
+# --- ZypherOS Repo Pivot (Injecting Custom Repos) ---
+echo "Pivoting system to ZypherOS Custom Repositories..."
+sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
+sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
+
+if ! head -n 5 /etc/pacman.d/mirrorlist | grep -q "repo.zyphersystems.com"; then
+  sed -i '1i Server = https://repo.zyphersystems.com/mirror/\$repo/os/\$arch\n' /etc/pacman.d/mirrorlist
+fi
+
+if ! grep -q "^\[zypheros\]" /etc/pacman.conf; then
+  cat <<'REPOEOF' >> /etc/pacman.conf
+
+[zypheros]
+SigLevel = Optional TrustAll
+Server = https://repo.zyphersystems.com/zypheros/\$arch
+REPOEOF
+fi
+
+# Do a quick sync so the new OS registers the ZypherOS repo
+pacman -Sy
+# ----------------------------------------------------
 
 # --- BRANDING ASSET DEPLOYMENT ---
 echo "Cloning ZypherOS repository for branding assets..."
