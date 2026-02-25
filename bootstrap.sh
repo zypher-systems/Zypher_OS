@@ -494,20 +494,20 @@ echo -e "\033[1;36m---------------------------------------" > /usr/share/zyphero
 echo -e "\033[1;36m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
 echo -e "\033[1;36m|@@:::::::::::::::::::::::::::::::::@@|" >> /usr/share/zypheros/branding/logo.txt
 echo -e "\033[1;36m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m|-------------------------Z:::::::::S" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                         /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                        Y:::::::::Y" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                       /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                      P:::::::::S" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                     /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                    H:::::::::T\033[1;35m" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m                   /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m                  E:::::::::E" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m                 /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m                R:::::::::M" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m               /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m              /:::::::::S" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m--------------:::::::::::--------------" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m|-------------------------Z:::::::::S--" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                        /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                      Y:::::::::Y" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                    /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                  P:::::::::S" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m                /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;36m              H:::::::::T\033[1;35m" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m           /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m         E:::::::::E" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m       /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m     R:::::::::M" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m   /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m /:::::::::S" >> /usr/share/zypheros/branding/logo.txt
+echo -e "\033[1;35m-:::::::::::---------------------------" >> /usr/share/zypheros/branding/logo.txt
 echo -e "\033[1;35m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
 echo -e "\033[1;35m|@@:::::::::::::::::::::::::::::::::@@|" >> /usr/share/zypheros/branding/logo.txt
 echo -e "\033[1;35m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
