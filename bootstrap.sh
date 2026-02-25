@@ -137,7 +137,6 @@ pacman -Sy archlinux-keyring --noconfirm
 pacman -Syy --noconfirm
 
 # --- 3.8. Pre-Pacstrap System Config ---
-# Silence the mkinitcpio vconsole warning during pacstrap
 mkdir -p /mnt/etc
 echo "KEYMAP=us" > /mnt/etc/vconsole.conf
 
@@ -164,7 +163,6 @@ echo "Staging system configurations and user dotfiles (/etc/skel)..."
 
 mkdir -p /mnt/etc/skel/.config/{ghostty/themes,fish,fastfetch,nvim}
 
-# Ghostty Theme & Config
 cat <<'SKEL' > /mnt/etc/skel/.config/ghostty/themes/carbonfox
 palette = 0=#282828
 palette = 1=#ee5396
@@ -200,7 +198,6 @@ theme = carbonfox
 shell-integration = fish
 SKEL
 
-# Fish Config
 cat <<'SKEL' > /mnt/etc/skel/.config/fish/config.fish
 if status is-interactive
     set -gx EDITOR nvim
@@ -351,7 +348,6 @@ if status is-interactive
 end
 SKEL
 
-# Fastfetch Config
 cat <<'SKEL' > /mnt/etc/skel/.config/fastfetch/config.jsonc
 {
     "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
@@ -439,7 +435,6 @@ cat <<'SKEL' > /mnt/etc/skel/.config/fastfetch/config.jsonc
 }
 SKEL
 
-# KDE Globals (Breeze Dark + Ghostty Default)
 cat <<'SKEL' > /mnt/etc/skel/.config/kdeglobals
 [General]
 ColorScheme=BreezeDark
@@ -447,21 +442,17 @@ Name=Breeze Dark
 TerminalApplication=ghostty
 SKEL
 
-# KDE NumLock Preference
 cat <<'SKEL' > /mnt/etc/skel/.config/kcminputrc
 [Keyboard]
 NumLock=0
 SKEL
 
-# System-wide Terminal Default
 echo "TERMINAL=ghostty" >> /mnt/etc/environment
 
-# SDDM NumLock & Breeze Theme Configurations
 mkdir -p /mnt/etc/sddm.conf.d
 echo -e "[General]\nNumlock=on" > /mnt/etc/sddm.conf.d/numlock.conf
 echo -e "[Theme]\nCurrent=breeze" > /mnt/etc/sddm.conf.d/10-theme.conf
 
-# Stage the global dark mode config for the SDDM background user
 mkdir -p /mnt/var/lib/sddm/.config
 cp /mnt/etc/skel/.config/kdeglobals /mnt/var/lib/sddm/.config/kdeglobals
 
@@ -478,24 +469,32 @@ sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
-# Clone Neovim Config into Skeleton BEFORE user creation
-# (This executes inside the chroot, where 'git' is fully installed)
 echo "Cloning LazyVim profile..."
 git clone https://github.com/zypher-systems/nvim-config.git /etc/skel/.config/nvim
 rm -rf /etc/skel/.config/nvim/.git
 
-# Create User (Automatically pulls everything from /etc/skel!)
+# Create User
 useradd -m -G wheel -s /usr/bin/fish $USERNAME
 echo "$USERNAME:$PASSWORD" | chpasswd
 echo "root:$PASSWORD" | chpasswd
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
-# Fix permissions for the SDDM theme background
 chown -R sddm:sddm /var/lib/sddm/.config
 
-# Bootstrap Neovim Plugins as the new user cleanly in the background
 echo "Bootstrapping Neovim plugins for \$USERNAME..."
 su - "\$USERNAME" -c "nvim --headless '+Lazy! sync' +qa >/dev/null 2>&1" || true
+
+# --- Install yay (AUR Helper) ---
+echo "Installing yay (AUR Helper)..."
+useradd -m builduser
+echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
+
+su - builduser -c "git clone https://aur.archlinux.org/yay-bin.git /home/builduser/yay-bin"
+su - builduser -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm"
+
+rm /etc/sudoers.d/builduser
+userdel -r builduser
+# --------------------------------
 
 systemctl enable NetworkManager
 systemctl enable sddm
