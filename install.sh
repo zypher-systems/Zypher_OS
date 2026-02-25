@@ -44,7 +44,7 @@ chmod +x *.sh
 ./08-plasma.sh
 ./09-branding.sh
 ./10-neovim.sh
-./11-limine.sh
+#./11-limine.sh
 
 # --- Cleanup ---
 echo "🧹 Cleaning up temporary files..."
