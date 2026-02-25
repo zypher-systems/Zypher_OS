@@ -481,7 +481,6 @@ background=/usr/share/zypheros/branding/wallpaper.png
 THEME
 
 echo "Staging Personal User Branding Assets (.local)..."
-# Placed in /etc/skel so they perfectly snapshot into the new user's home folder
 mkdir -p /etc/skel/.local/share/zypher/branding
 cp /usr/share/zypheros/branding/wallpaper.png /etc/skel/.local/share/zypher/branding/wallpaper.png
 cp /usr/share/zypheros/branding/icon.png /etc/skel/.local/share/zypher/branding/icon.png
@@ -491,7 +490,7 @@ git clone https://github.com/zypher-systems/nvim-config.git /etc/skel/.config/nv
 rm -rf /etc/skel/.config/nvim/.git
 
 # ==========================================
-# Create User (SNAPSHOTS ALL OF THE ABOVE)
+# Create User
 # ==========================================
 useradd -m -G wheel -s /usr/bin/fish $USERNAME
 echo "$USERNAME:$PASSWORD" | chpasswd
@@ -503,7 +502,7 @@ echo "Staging bulletproof hardcoded DBus script for first login..."
 mkdir -p /home/$USERNAME/.local/bin
 mkdir -p /home/$USERNAME/.config/autostart
 
-# Write the script using a placeholder (ZYPHERUSER) to avoid variable escaping madness
+# Write the script using a placeholder (ZYPHERUSER)
 cat <<'BRANDSCRIPT' > /home/$USERNAME/.local/bin/zypher-branding.sh
 #!/bin/bash
 exec > "/home/ZYPHERUSER/zypher-branding.log" 2>&1
@@ -533,12 +532,13 @@ qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
     }
 "
 
-echo "Success! Cleaning up autostart script..."
+echo "Success! Cleaning up autostart script and self-destructing..."
 rm -f "/home/ZYPHERUSER/.config/autostart/zypher-branding.desktop"
-# We leave this script and the .log file behind on purpose so you can check for errors!
+rm -f "/home/ZYPHERUSER/zypher-branding.log"
+rm -f "/home/ZYPHERUSER/.local/bin/zypher-branding.sh"
 BRANDSCRIPT
 
-# Safely swap the placeholder for the real username
+# Swap placeholder for the real username
 sed -i "s/ZYPHERUSER/$USERNAME/g" /home/$USERNAME/.local/bin/zypher-branding.sh
 chmod +x /home/$USERNAME/.local/bin/zypher-branding.sh
 
@@ -552,9 +552,9 @@ BRANDAUTO
 
 sed -i "s/ZYPHERUSER/$USERNAME/g" /home/$USERNAME/.config/autostart/zypher-branding.desktop
 
-# Ensure the user owns these new files
-chown -R $USERNAME:$USERNAME /home/$USERNAME/.local/bin/zypher-branding.sh
-chown -R $USERNAME:$USERNAME /home/$USERNAME/.config/autostart/zypher-branding.desktop
+# Fix directory and file permissions so the user can actually execute and delete them!
+chown -R $USERNAME:$USERNAME /home/$USERNAME/.config
+chown -R $USERNAME:$USERNAME /home/$USERNAME/.local
 # ==========================================
 
 # Map the global KDE theme file so the SDDM user matches the desktop theme
