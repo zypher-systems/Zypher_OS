@@ -22,7 +22,7 @@ TARGET_DRIVE=$(whiptail --title "Target Drive Configuration" --menu "Choose the 
 if [ -z "$TARGET_DRIVE" ]; then clear; echo "Installation canceled."; exit 1; fi
 
 # User Setup
-USERNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the desired username for the primary account:" 10 60 "Dusty" 3>&1 1>&2 2>&3)
+USERNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the desired username for the primary account:" 10 60 "user" 3>&1 1>&2 2>&3)
 if [ -z "$USERNAME" ]; then clear; echo "Installation canceled."; exit 1; fi
 
 # Password Setup
