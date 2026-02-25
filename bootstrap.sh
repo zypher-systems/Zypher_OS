@@ -126,9 +126,9 @@ sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 # Enable Multilib
 sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
 
-echo "Fetching fastest official global CDN mirrors..."
-# reflector is built into the Arch Live USB. We grab the 10 fastest mirrors available.
-reflector --latest 10 --sort rate --save /etc/pacman.d/mirrorlist || true
+echo "Fetching Arch Linux Global CDN..."
+# Replace the live mirrorlist with the official geo-routed edge network
+echo 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' > /etc/pacman.d/mirrorlist
 
 echo "Synchronizing package databases..."
 pacman -Sy archlinux-keyring --noconfirm
