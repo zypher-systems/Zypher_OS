@@ -128,6 +128,10 @@ sgdisk -n 1:0:+1M -t 1:ef02 -c 1:"BIOS_BOOT" "$TARGET_DRIVE"
 sgdisk -n 2:0:+1024M -t 2:ef00 -c 2:"EFI" "$TARGET_DRIVE"
 sgdisk -n 3:0:0 -t 3:8300 -c 3:"ROOT" "$TARGET_DRIVE"
 
+# HARDENING: Force kernel to re-read the partition table before formatting
+partprobe "$TARGET_DRIVE"
+sleep 2
+
 if [[ "$TARGET_DRIVE" == *"nvme"* ]] || [[ "$TARGET_DRIVE" == *"mmcblk"* ]]; then
   EFI_PART="${TARGET_DRIVE}p2"
   ROOT_PART="${TARGET_DRIVE}p3"
@@ -139,6 +143,11 @@ fi
 echo "Formatting partitions..."
 mkfs.vfat -F32 "$EFI_PART"
 mkfs.btrfs -f "$ROOT_PART"
+
+# HARDENING: Flush file system buffers to disk and wait for udev to catch up
+sync
+udevadm settle
+sleep 2
 
 # --- 3. ZypherOS BTRFS Subvolume Architecture ---
 echo "Building BTRFS subvolumes..."
