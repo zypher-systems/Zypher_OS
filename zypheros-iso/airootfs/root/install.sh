@@ -19,11 +19,30 @@ while read -r name size model; do
 done < <(lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop" | grep -v "rom")
 
 TARGET_DRIVE=$(whiptail --title "Target Drive Configuration" --menu "Choose the drive to install ZypherOS on:\nWARNING: ALL DATA ON THIS DRIVE WILL BE WIPED!" 15 65 5 "${DRIVE_OPTIONS[@]}" 3>&1 1>&2 2>&3)
+
+# 1. Check if the user hit Cancel. If so, exit immediately.
 if [ -z "$TARGET_DRIVE" ]; then
   clear
   echo "Installation canceled."
   exit 1
 fi
+
+# 2. Since they picked a drive, NOW we check the network.
+whiptail --title "Network Status" --infobox "Checking for active internet connection..." 8 50
+sleep 2
+
+while ! ping -c 1 archlinux.org >/dev/null 2>&1; do
+  if whiptail --title "Network Disconnected" --yesno "No active internet connection detected.\n\nZypherOS requires an internet connection to download base packages.\n\nWould you like to open the Network Manager to connect to Wi-Fi?" 14 60; then
+    clear
+    nmtui
+  else
+    clear
+    echo "Installation requires an internet connection. Aborting."
+    exit 1
+  fi
+done
+
+whiptail --title "Network Connected" --msgbox "Internet connection established! Proceeding with the setup." 8 50
 
 # User Setup
 USERNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the desired username for the primary account:" 10 60 "user" 3>&1 1>&2 2>&3)
@@ -506,6 +525,25 @@ pacman -Sy
 # ----------------------------------------------------
 
 # --- BRANDING ASSET DEPLOYMENT ---
+
+echo "Writing ZypherOS System Identity..."
+cat << 'OSREL' > /etc/os-release
+NAME="ZypherOS"
+PRETTY_NAME="ZypherOS Alpha"
+ID=zypheros
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="1;36"
+HOME_URL="https://zyphersystems.com/"
+DOCUMENTATION_URL="https://zyphersystems.com/"
+SUPPORT_URL="https://zyphersystems.com/"
+BUG_REPORT_URL="https://zyphersystems.com/"
+LOGO=zypheros
+OSREL
+
+# Ensure /usr/lib/os-release matches (Arch symlinks this)
+ln -sf /etc/os-release /usr/lib/os-release
+
 echo "Downloading ZypherOS branding assets..."
 mkdir -p /usr/share/zypheros/branding
 
