@@ -1,7 +1,25 @@
 #!/bin/bash
 set -e
 
-# --- 0. Firmware Check for User Awareness ---
+# --- 0. Pre-Flight Cleanup & Failsafes ---
+
+# Force unmount anything left over from previous runs.
+# (The '|| true' prevents 'set -e' from killing the script if nothing is mounted)
+umount -R /mnt 2>/dev/null || true
+
+# Define a cleanup function to run if the script crashes or is canceled
+cleanup_on_fail() {
+  if mountpoint -q /mnt; then
+    echo -e "\n[!] Installer interrupted or failed. Cleaning up mounted drives..."
+    umount -R /mnt 2>/dev/null || true
+    echo "Cleanup complete. You can safely restart the installer by running ./install.sh"
+  fi
+}
+
+# 'trap' listens for errors (ERR), Ctrl+C (INT), or termination signals (TERM)
+trap cleanup_on_fail ERR INT TERM
+
+# --- 1. Firmware Check for User Awareness ---
 if [ ! -d "/sys/firmware/efi" ]; then
   FIRMWARE_MSG="Notice: Booted in Legacy BIOS (SeaBIOS) mode. Proceeding with hybrid MBR/GPT install."
 else
@@ -10,7 +28,7 @@ fi
 
 whiptail --title "ZypherOS Installer - Alpha Release" --msgbox "Welcome to the ZypherOS Installer.\n\n$FIRMWARE_MSG\n\nPress Enter to begin the setup process." 12 60
 
-# --- 1. The Interview (TUI) ---
+# --- 2. The Interview (TUI) ---
 
 # Drive Selection
 DRIVE_OPTIONS=()
@@ -121,7 +139,7 @@ echo "   Initiating ZypherOS Deployment...     "
 echo "========================================="
 sleep 2
 
-# --- 2. Universal Partitioning ---
+# --- 3. Universal Partitioning ---
 echo "Wiping and partitioning $TARGET_DRIVE..."
 sgdisk -Z "$TARGET_DRIVE"
 sgdisk -n 1:0:+1M -t 1:ef02 -c 1:"BIOS_BOOT" "$TARGET_DRIVE"
@@ -149,7 +167,7 @@ sync
 udevadm settle
 sleep 2
 
-# --- 3. ZypherOS BTRFS Subvolume Architecture ---
+# --- 4. ZypherOS BTRFS Subvolume Architecture ---
 echo "Building BTRFS subvolumes..."
 mount "$ROOT_PART" /mnt
 btrfs subvolume create /mnt/@
@@ -168,7 +186,7 @@ mount -o "$MNT_OPTS,subvol=@log" "$ROOT_PART" /mnt/var/log
 mount -o "$MNT_OPTS,subvol=@pkg" "$ROOT_PART" /mnt/var/cache/pacman/pkg
 mount "$EFI_PART" /mnt/boot
 
-# --- 3.5. Optimize Live Environment for Speed ---
+# --- 4.5. Optimize Live Environment for Speed ---
 echo "Optimizing Live Environment for maximum download speeds..."
 
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
@@ -181,11 +199,11 @@ echo "Synchronizing package databases..."
 pacman -Sy archlinux-keyring --noconfirm
 pacman -Syy --noconfirm
 
-# --- 3.8. Pre-Pacstrap System Config ---
+# --- 4.8. Pre-Pacstrap System Config ---
 mkdir -p /mnt/etc
 echo "KEYMAP=us" >/mnt/etc/vconsole.conf
 
-# --- 4. The Pacstrap ---
+# --- 5. The Pacstrap ---
 echo "Preparing ZypherOS package lists..."
 ZYPHER_PACKAGES=(
   base base-devel linux linux-lts linux-firmware btrfs-progs sudo networkmanager
@@ -202,7 +220,7 @@ echo "Installing base system and ZypherOS dependencies..."
 pacstrap -K /mnt "${ZYPHER_PACKAGES[@]}"
 genfstab -U /mnt >>/mnt/etc/fstab
 
-# --- 4.5. Stage Skeleton Directory & System Configs ---
+# --- 5.5. Stage Skeleton Directory & System Configs ---
 echo "Staging system configurations and user dotfiles (/etc/skel)..."
 
 mkdir -p /mnt/etc/skel/.config/{ghostty/themes,fish,fastfetch,nvim,discord}
@@ -499,7 +517,7 @@ SKEL
 
 echo "TERMINAL=ghostty" >>/mnt/etc/environment
 
-# --- 5. The Chroot Handoff ---
+# --- 6. The Chroot Handoff ---
 echo "Generating internal configuration script..."
 
 cat <<EOF >/mnt/zypher_chroot.sh
@@ -737,7 +755,7 @@ chmod +x /mnt/zypher_chroot.sh
 echo "Entering Chroot to finalize system..."
 arch-chroot /mnt /zypher_chroot.sh
 
-# --- 6. Clean Up ---
+# --- 7. Clean Up ---
 rm /mnt/zypher_chroot.sh
 umount -R /mnt
 
