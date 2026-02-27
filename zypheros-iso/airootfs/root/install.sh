@@ -597,6 +597,10 @@ BUG_REPORT_URL="https://zyphersystems.com/"
 LOGO=zypheros
 OSREL
 
+echo "Updating TTY login prompts..."
+echo "ZypherOS Alpha \r (\l)" > /etc/issue
+echo "ZypherOS Alpha \r (\l)" > /etc/issue.net
+
 # Ensure /usr/lib/os-release matches (Arch symlinks this)
 ln -sf /etc/os-release /usr/lib/os-release
 
