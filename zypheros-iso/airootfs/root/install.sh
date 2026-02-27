@@ -238,10 +238,10 @@ ZYPHER_PACKAGES=(
   base base-devel linux linux-lts linux-firmware btrfs-progs sudo networkmanager
   $GPU_PKG limine snapper efibootmgr mtools
   plasma sddm pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil
-  konsole dolphin ark spectacle kate gwenview okular partitionmanager
+  dolphin ark spectacle kate gwenview okular partitionmanager
   git fastfetch fish neovim starship zoxide thefuck eza bat btop
-  lazygit ripgrep fd unzip wget xclip wl-clipboard ghostty gimp blender
-  inkscape libreoffice-fresh pika-backup obs-studio kdenlive thunderbird discord
+  lazygit ripgrep fd unzip wget xclip wl-clipboard ghostty firefox
+  libreoffice-fresh pika-backup thunderbird
   ttf-meslo-nerd noto-fonts noto-fonts-emoji
 )
 
@@ -585,17 +585,18 @@ pacman -Sy
 echo "Writing ZypherOS System Identity..."
 cat << 'OSREL' > /etc/os-release
 NAME="ZypherOS"
-PRETTY_NAME="ZypherOS Alpha"
+PRETTY_NAME="ZypherOS Live Environment"
 ID=zypheros
 ID_LIKE=arch
-BUILD_ID=rolling
+BUILD_ID=0.1.1
+VERSION="0.1.1 Alpha"
+VERSION_ID=0.1.1
 ANSI_COLOR="1;36"
 HOME_URL="https://zyphersystems.com/"
 DOCUMENTATION_URL="https://zyphersystems.com/"
 SUPPORT_URL="https://zyphersystems.com/"
 BUG_REPORT_URL="https://zyphersystems.com/"
 LOGO=zypheros
-OSREL
 
 echo "Updating TTY login prompts..."
 echo "ZypherOS Alpha \r (\l)" > /etc/issue
@@ -742,7 +743,7 @@ sudo -u builduser git clone https://aur.archlinux.org/yay-bin.git /home/builduse
 sudo -u builduser bash -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm"
 
 # Install Google Chrome via yay
-sudo -u builduser bash -c "yay -S --noconfirm google-chrome"
+#sudo -u builduser bash -c "yay -S --noconfirm google-chrome"
 
 rm /etc/sudoers.d/builduser
 userdel -r builduser
