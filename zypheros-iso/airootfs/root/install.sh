@@ -597,6 +597,7 @@ DOCUMENTATION_URL="https://zyphersystems.com/"
 SUPPORT_URL="https://zyphersystems.com/"
 BUG_REPORT_URL="https://zyphersystems.com/"
 LOGO=zypheros
+OSREL
 
 echo "Updating TTY login prompts..."
 echo "ZypherOS Alpha \r (\l)" > /etc/issue
