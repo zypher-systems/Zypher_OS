@@ -585,7 +585,7 @@ pacman -Sy
 echo "Writing ZypherOS System Identity..."
 cat << 'OSREL' > /etc/os-release
 NAME="ZypherOS"
-PRETTY_NAME="ZypherOS Live Environment"
+PRETTY_NAME="ZypherOS Alpha v0.1.1"
 ID=zypheros
 ID_LIKE=arch
 BUILD_ID=0.1.1
