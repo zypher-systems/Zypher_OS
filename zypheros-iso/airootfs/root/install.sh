@@ -62,13 +62,32 @@ done
 
 whiptail --title "Network Connected" --msgbox "Internet connection established! Proceeding with the setup." 8 50
 
-# User Setup
-USERNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the desired username for the primary account:" 10 60 "user" 3>&1 1>&2 2>&3)
-if [ -z "$USERNAME" ]; then
+# Full Name Setup
+REALNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the Full Name (Display Name) for the primary user:\n(This will be shown on the login screen and in system settings.)" 10 60 "" 3>&1 1>&2 2>&3)
+
+if [ -z "$REALNAME" ]; then
   clear
   echo "Installation canceled."
   exit 1
 fi
+
+# User Setup
+while true; do
+  USERNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the desired username for the primary account:\n(Lowercase letters, numbers, and hyphens only. No spaces.)" 10 60 "user" 3>&1 1>&2 2>&3)
+
+  if [ -z "$USERNAME" ]; then
+    clear
+    echo "Installation canceled."
+    exit 1
+  fi
+
+  # Validation: Must start with lowercase letter, followed by lowercase, numbers, _, or -
+  if [[ "$USERNAME" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+    break
+  else
+    whiptail --title "Invalid Username" --msgbox "Username '$USERNAME' is invalid.\n\nUsernames must:\n- Start with a lowercase letter\n- Contain only lowercase letters, numbers, hyphens, or underscores\n- Contain NO spaces, capital letters, or special characters" 12 65
+  fi
+done
 
 # Password Setup
 while true; do
@@ -83,12 +102,22 @@ while true; do
 done
 
 # Hostname Setup
-HOSTNAME=$(whiptail --title "Network Setup" --inputbox "Enter the system hostname (Computer Name):" 10 60 "zypheros" 3>&1 1>&2 2>&3)
-if [ -z "$HOSTNAME" ]; then
-  clear
-  echo "Installation canceled."
-  exit 1
-fi
+while true; do
+  HOSTNAME=$(whiptail --title "Network Setup" --inputbox "Enter the system hostname (Computer Name):\n(Lowercase letters, numbers, and hyphens only. No spaces.)" 10 60 "zypheros" 3>&1 1>&2 2>&3)
+
+  if [ -z "$HOSTNAME" ]; then
+    clear
+    echo "Installation canceled."
+    exit 1
+  fi
+
+  # Validation: Alphanumeric and hyphens only. Cannot start/end with a hyphen.
+  if [[ "$HOSTNAME" =~ ^[a-z0-9][a-z0-9-]*[a-z0-9]$ ]] || [[ "$HOSTNAME" =~ ^[a-z0-9]$ ]]; then
+    break
+  else
+    whiptail --title "Invalid Hostname" --msgbox "Hostname '$HOSTNAME' is invalid.\n\nHostnames must:\n- Contain only lowercase letters, numbers, and hyphens\n- Contain NO spaces or underscores\n- Not start or end with a hyphen" 12 60
+  fi
+done
 
 # Smart GPU Auto-Detect
 GPU_VENDOR=$(lspci -vnn | grep -iE 'VGA|3D' | grep -iE 'NVIDIA|AMD|Advanced Micro Devices|Intel' | head -n 1)
@@ -625,7 +654,7 @@ rm -rf /etc/skel/.config/nvim/.git
 # ==========================================
 # Create User
 # ==========================================
-useradd -m -G wheel -s /usr/bin/fish $USERNAME
+useradd -m -c "$REALNAME" -G wheel -s /usr/bin/fish $USERNAME
 echo "$USERNAME:$PASSWORD" | chpasswd
 echo "root:$PASSWORD" | chpasswd
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
