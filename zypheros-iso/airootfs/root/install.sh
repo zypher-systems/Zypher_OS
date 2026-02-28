@@ -578,64 +578,10 @@ fi
 
 # Do a quick sync so the new OS registers the ZypherOS repo
 pacman -Sy
+
+# Install the ZypherOS release package and force identity takeover
+pacman -S --noconfirm --overwrite="/etc/*" zypheros-release
 # ----------------------------------------------------
-
-# --- BRANDING ASSET DEPLOYMENT ---
-
-echo "Writing ZypherOS System Identity..."
-cat << 'OSREL' > /etc/os-release
-NAME="ZypherOS"
-PRETTY_NAME="ZypherOS Alpha v0.1.1"
-ID=zypheros
-ID_LIKE=arch
-BUILD_ID=0.1.1
-VERSION="0.1.1 Alpha"
-VERSION_ID=0.1.1
-ANSI_COLOR="1;36"
-HOME_URL="https://zyphersystems.com/"
-DOCUMENTATION_URL="https://zyphersystems.com/"
-SUPPORT_URL="https://zyphersystems.com/"
-BUG_REPORT_URL="https://zyphersystems.com/"
-LOGO=zypheros
-OSREL
-
-echo "Updating TTY login prompts..."
-echo "ZypherOS Alpha \r (\l)" > /etc/issue
-echo "ZypherOS Alpha \r (\l)" > /etc/issue.net
-
-# Ensure /usr/lib/os-release matches (Arch symlinks this)
-ln -sf /etc/os-release /usr/lib/os-release
-
-echo "Downloading ZypherOS branding assets..."
-mkdir -p /usr/share/zypheros/branding
-
-# Pull raw files directly from GitHub
-curl -sL "https://raw.githubusercontent.com/zypher-systems/Zypher_OS/main/images/zypher_os_wallpaper.png" -o /usr/share/zypheros/branding/wallpaper.png
-curl -sL "https://raw.githubusercontent.com/zypher-systems/Zypher_OS/main/images/zypher_os_launcher_icon.png" -o /usr/share/zypheros/branding/icon.png
-
-echo "Generating Dynamic Upscaled ASCII Fastfetch Logo..."
-echo -e "\033[1;36m---------------------------------------" > /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m|@@:::::::::::::::::::::::::::::::::@@|" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m|-------------------------Z:::::::::S--" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                        /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                      Y:::::::::Y" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                    /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                  P:::::::::S" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m                /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;36m              H:::::::::T\033[1;35m" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m           /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m         E:::::::::E" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m       /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m     R:::::::::M" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m   /:::::::::/" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m /:::::::::S" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m-:::::::::::---------------------------" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m|@@:::::::::::::::::::::::::::::::::@@|" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m|@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|" >> /usr/share/zypheros/branding/logo.txt
-echo -e "\033[1;35m---------------------------------------\033[0m" >> /usr/share/zypheros/branding/logo.txt
 
 echo "Configuring SDDM Login Screen background and themes..."
 mkdir -p /etc/sddm.conf.d
