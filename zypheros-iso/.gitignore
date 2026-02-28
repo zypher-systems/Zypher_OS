@@ -4,3 +4,4 @@ out/
 *.iso
 *.img
 *.sfs
+*.qcow2
