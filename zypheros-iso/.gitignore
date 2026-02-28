@@ -5,3 +5,4 @@ out/
 *.img
 *.sfs
 *.qcow2
+spawn_vm.sh
