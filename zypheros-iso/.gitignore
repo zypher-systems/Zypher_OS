@@ -6,3 +6,4 @@ out/
 *.sfs
 *.qcow2
 spawn_vm.sh
+build_iso.sh
