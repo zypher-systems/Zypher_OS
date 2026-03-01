@@ -261,7 +261,7 @@ ZYPHER_PACKAGES=(
   $GPU_PKG limine snapper efibootmgr mtools
   plasma sddm pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil
   dolphin ark spectacle kate gwenview okular partitionmanager
-  git fastfetch neovim zoxide thefuck eza bat btop
+  git fastfetch neovim zoxide thefuck eza bat btop nano
   lazygit ripgrep fd unzip wget xclip wl-clipboard firefox
   libreoffice-fresh pika-backup thunderbird
   ttf-meslo-nerd noto-fonts noto-fonts-emoji
