@@ -2,12 +2,8 @@
 set -e
 
 # --- 0. Pre-Flight Cleanup & Failsafes ---
-
-# Force unmount anything left over from previous runs.
-# (The '|| true' prevents 'set -e' from killing the script if nothing is mounted)
 umount -R /mnt 2>/dev/null || true
 
-# Define a cleanup function to run if the script crashes or is canceled
 cleanup_on_fail() {
   if mountpoint -q /mnt; then
     echo -e "\n[!] Installer interrupted or failed. Cleaning up mounted drives..."
@@ -15,9 +11,74 @@ cleanup_on_fail() {
     echo "Cleanup complete. You can safely restart the installer by running ./install.sh"
   fi
 }
-
-# 'trap' listens for errors (ERR), Ctrl+C (INT), or termination signals (TERM)
 trap cleanup_on_fail ERR INT TERM
+
+# --- TUI MODULES ---
+BACKTITLE="ZypherOS Installer - v0.1.2 Alpha"
+
+setup_timezone() {
+  REGION=$(whiptail --backtitle "$BACKTITLE" --title "Timezone Selection" --menu "Select your region:" 15 50 8 \
+    "America" "" "Europe" "" "Asia" "" "Africa" "" "Australia" "" "Pacific" "" "US" "" 3>&1 1>&2 2>&3)
+
+  if [ -z "$REGION" ]; then
+    clear
+    echo "Installation canceled."
+    exit 1
+  fi
+
+  CITY_OPTIONS=()
+  for file in /usr/share/zoneinfo/"$REGION"/*; do
+    if [ -f "$file" ]; then
+      CITY_OPTIONS+=("$(basename "$file")" "")
+    fi
+  done
+
+  CITY=$(whiptail --backtitle "$BACKTITLE" --title "Timezone Selection" --menu "Select your city:" 20 50 12 "${CITY_OPTIONS[@]}" 3>&1 1>&2 2>&3)
+
+  if [ -z "$CITY" ]; then
+    clear
+    echo "Installation canceled."
+    exit 1
+  fi
+
+  SELECTED_TIMEZONE="$REGION/$CITY"
+}
+
+setup_user_account() {
+  FULL_NAME=$(whiptail --backtitle "$BACKTITLE" --title "Account Setup" \
+    --inputbox "Enter the user's Full Name:\n(This will be shown on the login screen.)" 10 60 3>&1 1>&2 2>&3)
+  if [ -z "$FULL_NAME" ]; then
+    clear
+    echo "Installation canceled."
+    exit 1
+  fi
+
+  # Awk logic: First initial + Last Name, all lowercase
+  DEFAULT_USER=$(echo "$FULL_NAME" | awk '{if (NF==1) print $1; else print substr($1,1,1) $NF}' | tr '[:upper:]' '[:lower:]')
+
+  USERNAME=$(whiptail --backtitle "$BACKTITLE" --title "Account Setup" \
+    --inputbox "Confirm or edit your username:\n(Lowercase letters, numbers, hyphens only.)" 10 60 "$DEFAULT_USER" 3>&1 1>&2 2>&3)
+  if [ -z "$USERNAME" ]; then
+    clear
+    echo "Installation canceled."
+    exit 1
+  fi
+
+  while true; do
+    PASSWORD=$(whiptail --backtitle "$BACKTITLE" --title "Security Setup" \
+      --passwordbox "Enter the password for user '$USERNAME':\n(This will also be the Root password)" 10 60 3>&1 1>&2 2>&3)
+    PASSWORD_CONFIRM=$(whiptail --backtitle "$BACKTITLE" --title "Security Setup" \
+      --passwordbox "Confirm your password:" 10 60 3>&1 1>&2 2>&3)
+
+    if [ -z "$PASSWORD" ]; then
+      whiptail --backtitle "$BACKTITLE" --title "Error" --msgbox "Password cannot be empty." 8 50
+    elif [ "$PASSWORD" != "$PASSWORD_CONFIRM" ]; then
+      whiptail --backtitle "$BACKTITLE" --title "Error" --msgbox "Passwords do not match." 8 50
+    else
+      break
+    fi
+  done
+}
 
 # --- 1. Firmware Check for User Awareness ---
 if [ ! -d "/sys/firmware/efi" ]; then
@@ -26,7 +87,7 @@ else
   FIRMWARE_MSG="Notice: Booted in UEFI mode. Proceeding with standard EFI install."
 fi
 
-whiptail --title "ZypherOS Installer - Alpha Release" --msgbox "Welcome to the ZypherOS Installer.\n\n$FIRMWARE_MSG\n\nPress Enter to begin the setup process." 12 60
+whiptail --backtitle "$BACKTITLE" --title "ZypherOS Installer" --msgbox "Welcome to the ZypherOS Installer.\n\n$FIRMWARE_MSG\n\nPress Enter to begin the setup process." 12 60
 
 # --- 2. The Interview (TUI) ---
 
@@ -36,21 +97,20 @@ while read -r name size model; do
   DRIVE_OPTIONS+=("$name" "$model ($size)")
 done < <(lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop" | grep -v "rom")
 
-TARGET_DRIVE=$(whiptail --title "Target Drive Configuration" --menu "Choose the drive to install ZypherOS on:\nWARNING: ALL DATA ON THIS DRIVE WILL BE WIPED!" 15 65 5 "${DRIVE_OPTIONS[@]}" 3>&1 1>&2 2>&3)
+TARGET_DRIVE=$(whiptail --backtitle "$BACKTITLE" --title "Target Drive Configuration" --menu "Choose the drive to install ZypherOS on:\nWARNING: ALL DATA ON THIS DRIVE WILL BE WIPED!" 15 65 5 "${DRIVE_OPTIONS[@]}" 3>&1 1>&2 2>&3)
 
-# 1. Check if the user hit Cancel. If so, exit immediately.
 if [ -z "$TARGET_DRIVE" ]; then
   clear
   echo "Installation canceled."
   exit 1
 fi
 
-# 2. Since they picked a drive, NOW we check the network.
-whiptail --title "Network Status" --infobox "Checking for active internet connection..." 8 50
+# Network Check
+whiptail --backtitle "$BACKTITLE" --title "Network Status" --infobox "Checking for active internet connection..." 8 50
 sleep 2
 
 while ! ping -c 1 archlinux.org >/dev/null 2>&1; do
-  if whiptail --title "Network Disconnected" --yesno "No active internet connection detected.\n\nZypherOS requires an internet connection to download base packages.\n\nWould you like to open the Network Manager to connect to Wi-Fi?" 14 60; then
+  if whiptail --backtitle "$BACKTITLE" --title "Network Disconnected" --yesno "No active internet connection detected.\n\nZypherOS requires an internet connection to download base packages.\n\nWould you like to open the Network Manager to connect to Wi-Fi?" 14 60; then
     clear
     nmtui
   else
@@ -60,50 +120,15 @@ while ! ping -c 1 archlinux.org >/dev/null 2>&1; do
   fi
 done
 
-whiptail --title "Network Connected" --msgbox "Internet connection established! Proceeding with the setup." 8 50
+whiptail --backtitle "$BACKTITLE" --title "Network Connected" --msgbox "Internet connection established! Proceeding with the setup." 8 50
 
-# Full Name Setup
-REALNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the Full Name (Display Name) for the primary user:\n(This will be shown on the login screen and in system settings.)" 10 60 "" 3>&1 1>&2 2>&3)
-
-if [ -z "$REALNAME" ]; then
-  clear
-  echo "Installation canceled."
-  exit 1
-fi
-
-# User Setup
-while true; do
-  USERNAME=$(whiptail --title "User Account Setup" --inputbox "Enter the desired username for the primary account:\n(Lowercase letters, numbers, and hyphens only. No spaces.)" 10 60 "user" 3>&1 1>&2 2>&3)
-
-  if [ -z "$USERNAME" ]; then
-    clear
-    echo "Installation canceled."
-    exit 1
-  fi
-
-  # Validation: Must start with lowercase letter, followed by lowercase, numbers, _, or -
-  if [[ "$USERNAME" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
-    break
-  else
-    whiptail --title "Invalid Username" --msgbox "Username '$USERNAME' is invalid.\n\nUsernames must:\n- Start with a lowercase letter\n- Contain only lowercase letters, numbers, hyphens, or underscores\n- Contain NO spaces, capital letters, or special characters" 12 65
-  fi
-done
-
-# Password Setup
-while true; do
-  PASSWORD=$(whiptail --title "Security Setup" --passwordbox "Enter the password for $USERNAME (This will also be the Root password):" 10 60 3>&1 1>&2 2>&3)
-  PASSWORD_CONFIRM=$(whiptail --title "Security Setup" --passwordbox "Confirm your password:" 10 60 3>&1 1>&2 2>&3)
-
-  if [ "$PASSWORD" == "$PASSWORD_CONFIRM" ] && [ -n "$PASSWORD" ]; then
-    break
-  else
-    whiptail --title "Error" --msgbox "Passwords do not match or are empty. Please try again." 10 60
-  fi
-done
+# Run Dynamic Timezone and Account Setup Modules
+setup_timezone
+setup_user_account
 
 # Hostname Setup
 while true; do
-  HOSTNAME=$(whiptail --title "Network Setup" --inputbox "Enter the system hostname (Computer Name):\n(Lowercase letters, numbers, and hyphens only. No spaces.)" 10 60 "zypheros" 3>&1 1>&2 2>&3)
+  HOSTNAME=$(whiptail --backtitle "$BACKTITLE" --title "Network Setup" --inputbox "Enter the system hostname (Computer Name):\n(Lowercase letters, numbers, and hyphens only. No spaces.)" 10 60 "zypheros" 3>&1 1>&2 2>&3)
 
   if [ -z "$HOSTNAME" ]; then
     clear
@@ -111,11 +136,10 @@ while true; do
     exit 1
   fi
 
-  # Validation: Alphanumeric and hyphens only. Cannot start/end with a hyphen.
   if [[ "$HOSTNAME" =~ ^[a-z0-9][a-z0-9-]*[a-z0-9]$ ]] || [[ "$HOSTNAME" =~ ^[a-z0-9]$ ]]; then
     break
   else
-    whiptail --title "Invalid Hostname" --msgbox "Hostname '$HOSTNAME' is invalid.\n\nHostnames must:\n- Contain only lowercase letters, numbers, and hyphens\n- Contain NO spaces or underscores\n- Not start or end with a hyphen" 12 60
+    whiptail --backtitle "$BACKTITLE" --title "Invalid Hostname" --msgbox "Hostname '$HOSTNAME' is invalid.\n\nHostnames must:\n- Contain only lowercase letters, numbers, and hyphens\n- Contain NO spaces or underscores\n- Not start or end with a hyphen" 12 60
   fi
 done
 
@@ -135,7 +159,7 @@ else
   DEFAULT="4"
 fi
 
-GPU_CHOICE=$(whiptail --title "Graphics Drivers" --menu "Hardware Scan detected: $DETECTED\n\nPlease verify your graphics driver deployment:" 15 65 4 \
+GPU_CHOICE=$(whiptail --backtitle "$BACKTITLE" --title "Graphics Drivers" --menu "Hardware Scan detected: $DETECTED\n\nPlease verify your graphics driver deployment:" 15 65 4 \
   "1" "AMD (Open Source) - Recommended" \
   "2" "NVIDIA (Proprietary)" \
   "3" "Intel" \
@@ -156,7 +180,7 @@ case $GPU_CHOICE in
 esac
 
 # Final Point of No Return
-if ! whiptail --title "WARNING: DATA DESTRUCTION" --yesno "You are about to COMPLETELY WIPE the following drive:\n\n$TARGET_DRIVE\n\nAre you absolutely sure you want to proceed?" 12 60; then
+if ! whiptail --backtitle "$BACKTITLE" --title "WARNING: DATA DESTRUCTION" --yesno "You are about to COMPLETELY WIPE the following drive:\n\n$TARGET_DRIVE\n\nAre you absolutely sure you want to proceed?" 12 60; then
   clear
   echo "Installation aborted by user."
   exit 1
@@ -175,7 +199,6 @@ sgdisk -n 1:0:+1M -t 1:ef02 -c 1:"BIOS_BOOT" "$TARGET_DRIVE"
 sgdisk -n 2:0:+1024M -t 2:ef00 -c 2:"EFI" "$TARGET_DRIVE"
 sgdisk -n 3:0:0 -t 3:8300 -c 3:"ROOT" "$TARGET_DRIVE"
 
-# HARDENING: Force kernel to re-read the partition table before formatting
 partprobe "$TARGET_DRIVE"
 sleep 2
 
@@ -191,7 +214,6 @@ echo "Formatting partitions..."
 mkfs.vfat -F32 "$EFI_PART"
 mkfs.btrfs -f "$ROOT_PART"
 
-# HARDENING: Flush file system buffers to disk and wait for udev to catch up
 sync
 udevadm settle
 sleep 2
@@ -217,7 +239,6 @@ mount "$EFI_PART" /mnt/boot
 
 # --- 4.5. Optimize Live Environment for Speed ---
 echo "Optimizing Live Environment for maximum download speeds..."
-
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
 
@@ -234,13 +255,14 @@ echo "KEYMAP=us" >/mnt/etc/vconsole.conf
 
 # --- 5. The Pacstrap ---
 echo "Preparing ZypherOS package lists..."
+# Removed fish, ghostty, and starship - handled by zypheros-ghostty
 ZYPHER_PACKAGES=(
   base base-devel linux linux-lts linux-firmware btrfs-progs sudo networkmanager
   $GPU_PKG limine snapper efibootmgr mtools
   plasma sddm pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil
   dolphin ark spectacle kate gwenview okular partitionmanager
-  git fastfetch fish neovim starship zoxide thefuck eza bat btop
-  lazygit ripgrep fd unzip wget xclip wl-clipboard ghostty firefox
+  git fastfetch neovim zoxide thefuck eza bat btop
+  lazygit ripgrep fd unzip wget xclip wl-clipboard firefox
   libreoffice-fresh pika-backup thunderbird
   ttf-meslo-nerd noto-fonts noto-fonts-emoji
 )
@@ -252,36 +274,13 @@ genfstab -U /mnt >>/mnt/etc/fstab
 # --- 5.5. Stage Skeleton Directory & System Configs ---
 echo "Staging system configurations and user dotfiles (/etc/skel)..."
 
-mkdir -p /mnt/etc/skel/.config/{ghostty/themes,fish,fastfetch,nvim,discord}
+# Removed ghostty and fish from the skel directory creation
+mkdir -p /mnt/etc/skel/.config/{fastfetch,nvim,discord}
 
 cat <<'SKEL' >/mnt/etc/skel/.config/discord/settings.json
 {
   "SKIP_HOST_UPDATE": true
 }
-SKEL
-
-cat <<'SKEL' >/mnt/etc/skel/.config/ghostty/themes/carbonfox
-palette = 0=#282828
-palette = 1=#ee5396
-palette = 2=#25be6a
-palette = 3=#08bdba
-palette = 4=#78a9ff
-palette = 5=#be95ff
-palette = 6=#33b1ff
-palette = 7=#dfdfe0
-palette = 8=#484848
-palette = 9=#f16da6
-palette = 10=#46c880
-palette = 11=#2dc7c4
-palette = 12=#8cb6ff
-palette = 13=#c8a5ff
-palette = 14=#52bdff
-palette = 15=#e4e4e5
-background = 161616
-foreground = f2f4f8
-cursor-color = e4e4e5
-selection-background = 2a2a2a
-selection-foreground = f2f4f8
 SKEL
 
 cat <<'SKEL' >/mnt/etc/skel/.config/fastfetch/config.jsonc
@@ -391,7 +390,8 @@ echo "Generating internal configuration script..."
 cat <<EOF >/mnt/zypher_chroot.sh
 #!/bin/bash
 echo "$HOSTNAME" > /etc/hostname
-ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
+# Injects the user's selected Timezone dynamically
+ln -sf /usr/share/zoneinfo/$SELECTED_TIMEZONE /etc/localtime
 hwclock --systohc
 sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
@@ -415,7 +415,6 @@ Server = https://repo.zyphersystems.com/zypheros/\$arch
 REPOEOF
 fi
 
-# Do a quick sync so the new OS registers the ZypherOS repo
 pacman -Sy
 
 # Install the ZypherOS release package and force identity takeover
@@ -445,7 +444,7 @@ rm -rf /etc/skel/.config/nvim/.git
 # ==========================================
 # Create User
 # ==========================================
-useradd -m -c "$REALNAME" -G wheel -s /usr/bin/fish $USERNAME
+useradd -m -c "$FULL_NAME" -G wheel -s /usr/bin/fish $USERNAME
 echo "$USERNAME:$PASSWORD" | chpasswd
 echo "root:$PASSWORD" | chpasswd
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
@@ -455,7 +454,6 @@ echo "Staging bulletproof hardcoded DBus script for first login..."
 mkdir -p /home/$USERNAME/.local/bin
 mkdir -p /home/$USERNAME/.config/autostart
 
-# Write the script using a placeholder (ZYPHERUSER)
 cat <<'BRANDSCRIPT' > /home/$USERNAME/.local/bin/zypher-branding.sh
 #!/bin/bash
 exec > "/home/ZYPHERUSER/zypher-branding.log" 2>&1
@@ -491,7 +489,6 @@ rm -f "/home/ZYPHERUSER/zypher-branding.log"
 rm -f "/home/ZYPHERUSER/.local/bin/zypher-branding.sh"
 BRANDSCRIPT
 
-# Swap placeholder for the real username
 sed -i "s/ZYPHERUSER/$USERNAME/g" /home/$USERNAME/.local/bin/zypher-branding.sh
 chmod +x /home/$USERNAME/.local/bin/zypher-branding.sh
 
@@ -505,31 +502,25 @@ BRANDAUTO
 
 sed -i "s/ZYPHERUSER/$USERNAME/g" /home/$USERNAME/.config/autostart/zypher-branding.desktop
 
-# Fix directory and file permissions
 chown -R $USERNAME:$USERNAME /home/$USERNAME/.config
 chown -R $USERNAME:$USERNAME /home/$USERNAME/.local
 # ==========================================
 
-# Map the global KDE theme file so the SDDM user matches the desktop theme
 mkdir -p /var/lib/sddm/.config
 cp /etc/skel/.config/kdeglobals /var/lib/sddm/.config/kdeglobals
 chown -R sddm:sddm /var/lib/sddm/.config
 
-echo "Bootstrapping Neovim plugins for \$USERNAME..."
-sudo -u "\$USERNAME" nvim --headless "+Lazy! sync" +qa >/dev/null 2>&1 || true
+echo "Bootstrapping Neovim plugins for $USERNAME..."
+sudo -u "$USERNAME" nvim --headless "+Lazy! sync" +qa >/dev/null 2>&1 || true
 
-# --- Install yay (AUR Helper) & Native Packages ---
+# --- Install yay (AUR Helper) ---
 echo "Installing yay and AUR packages..."
 useradd -m -s /bin/bash builduser
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 chmod 440 /etc/sudoers.d/builduser
 
-# Install yay
 sudo -u builduser git clone https://aur.archlinux.org/yay-bin.git /home/builduser/yay-bin
 sudo -u builduser bash -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm"
-
-# Install Google Chrome via yay
-#sudo -u builduser bash -c "yay -S --noconfirm google-chrome"
 
 rm /etc/sudoers.d/builduser
 userdel -r builduser
@@ -579,7 +570,7 @@ arch-chroot /mnt /zypher_chroot.sh
 rm /mnt/zypher_chroot.sh
 umount -R /mnt
 
-whiptail --title "Installation Complete" --msgbox "ZypherOS has been successfully installed!\n\nPress Enter to exit the installer and reboot." 10 60
+whiptail --backtitle "$BACKTITLE" --title "Installation Complete" --msgbox "ZypherOS has been successfully installed!\n\nPress Enter to exit the installer and reboot." 10 60
 clear
 
 echo "========================================="
