@@ -14,7 +14,7 @@ cleanup_on_fail() {
 trap cleanup_on_fail ERR INT TERM
 
 # --- TUI MODULES ---
-BACKTITLE="ZypherOS Installer - v0.1.2 Alpha"
+BACKTITLE="ZypherOS Installer - v0.1.3 Alpha"
 
 setup_timezone() {
   REGION=$(whiptail --backtitle "$BACKTITLE" --title "Timezone Selection" --menu "Select your region:" 15 50 8 \
@@ -53,7 +53,6 @@ setup_user_account() {
     exit 1
   fi
 
-  # Awk logic: First initial + Last Name, all lowercase
   DEFAULT_USER=$(echo "$FULL_NAME" | awk '{if (NF==1) print $1; else print substr($1,1,1) $NF}' | tr '[:upper:]' '[:lower:]')
 
   USERNAME=$(whiptail --backtitle "$BACKTITLE" --title "Account Setup" \
@@ -89,15 +88,77 @@ fi
 
 whiptail --backtitle "$BACKTITLE" --title "ZypherOS Installer" --msgbox "Welcome to the ZypherOS Installer.\n\n$FIRMWARE_MSG\n\nPress Enter to begin the setup process." 12 60
 
-# --- 2. The Interview (TUI) ---
+# --- 2. Dynamic Network Setup ---
+NET_IFACE=$(ip -o link show | awk -F': ' '{print $2}' | grep -v lo | head -n 1)
 
-# Drive Selection
+while true; do
+  if ping -c 1 -W 2 archlinux.org >/dev/null 2>&1; then
+    NET_STATUS="Connected (Internet Accessible)"
+    CONNECTED=true
+  else
+    NET_STATUS="Disconnected (No Internet Access)"
+    CONNECTED=false
+  fi
+
+  NET_CHOICE=$(whiptail --backtitle "$BACKTITLE" --title "Network Configuration" --menu "Interface: $NET_IFACE\nStatus: $NET_STATUS\n\nSelect network setup for this installation AND the final system:" 16 65 2 \
+    "1" "DHCP (Automatic - Recommended)" \
+    "2" "Static IP (Datacenter / Manual)" 3>&1 1>&2 2>&3)
+
+  if [ -z "$NET_CHOICE" ]; then
+    clear
+    echo "Installation canceled."
+    exit 1
+  fi
+
+  if [ "$NET_CHOICE" == "2" ]; then
+    STATIC_IP=$(whiptail --backtitle "$BACKTITLE" --title "Static IP Setup" --inputbox "Enter IP Address with CIDR\n(e.g., 192.168.1.50/24):" 10 60 3>&1 1>&2 2>&3)
+    STATIC_GW=$(whiptail --backtitle "$BACKTITLE" --title "Static IP Setup" --inputbox "Enter Default Gateway\n(e.g., 192.168.1.1):" 10 60 3>&1 1>&2 2>&3)
+    STATIC_DNS=$(whiptail --backtitle "$BACKTITLE" --title "Static IP Setup" --inputbox "Enter DNS Server\n(e.g., 1.1.1.1 or 8.8.8.8):" 10 60 "1.1.1.1" 3>&1 1>&2 2>&3)
+
+    whiptail --backtitle "$BACKTITLE" --title "Applying Network" --infobox "Applying Static IP to $NET_IFACE..." 8 50
+    ip addr flush dev "$NET_IFACE"
+    ip addr add "$STATIC_IP" dev "$NET_IFACE"
+    ip route add default via "$STATIC_GW"
+    echo "nameserver $STATIC_DNS" >/etc/resolv.conf
+    sleep 2
+
+    if ping -c 1 -W 3 archlinux.org >/dev/null 2>&1; then
+      whiptail --backtitle "$BACKTITLE" --title "Network Connected" --msgbox "Static IP successfully established internet connectivity!" 8 50
+      break
+    else
+      if whiptail --backtitle "$BACKTITLE" --title "Network Failed" --yesno "Could not reach the internet with those settings.\n\nWould you like to try again?" 10 50; then
+        continue
+      else
+        clear
+        echo "Installation requires an internet connection. Aborting."
+        exit 1
+      fi
+    fi
+  else
+    if [ "$CONNECTED" = true ]; then
+      whiptail --backtitle "$BACKTITLE" --title "Network Connected" --msgbox "Internet connection confirmed via DHCP! Proceeding with setup." 8 50
+      break
+    else
+      if whiptail --backtitle "$BACKTITLE" --title "Network Disconnected" --yesno "DHCP did not establish a connection.\n\nWould you like to open Network Manager (nmtui) to connect to Wi-Fi?" 10 60; then
+        clear
+        nmtui
+        continue
+      else
+        clear
+        echo "Installation requires an internet connection. Aborting."
+        exit 1
+      fi
+    fi
+  fi
+done
+
+# --- 3. Disk Selection & Partitioning Setup ---
 DRIVE_OPTIONS=()
 while read -r name size model; do
   DRIVE_OPTIONS+=("$name" "$model ($size)")
 done < <(lsblk -d -p -n -l -o NAME,SIZE,MODEL | grep -v "loop" | grep -v "rom")
 
-TARGET_DRIVE=$(whiptail --backtitle "$BACKTITLE" --title "Target Drive Configuration" --menu "Choose the drive to install ZypherOS on:\nWARNING: ALL DATA ON THIS DRIVE WILL BE WIPED!" 15 65 5 "${DRIVE_OPTIONS[@]}" 3>&1 1>&2 2>&3)
+TARGET_DRIVE=$(whiptail --backtitle "$BACKTITLE" --title "Target Drive Configuration" --menu "Choose the drive to install ZypherOS on:" 15 65 5 "${DRIVE_OPTIONS[@]}" 3>&1 1>&2 2>&3)
 
 if [ -z "$TARGET_DRIVE" ]; then
   clear
@@ -105,28 +166,59 @@ if [ -z "$TARGET_DRIVE" ]; then
   exit 1
 fi
 
-# Network Check
-whiptail --backtitle "$BACKTITLE" --title "Network Status" --infobox "Checking for active internet connection..." 8 50
-sleep 2
+PARTITION_METHOD=$(whiptail --backtitle "$BACKTITLE" --title "Partitioning Method" --menu "How would you like to partition $TARGET_DRIVE?" 15 65 2 \
+  "1" "Auto-Partition (Wipe entire drive - Recommended)" \
+  "2" "Manual Partition (Custom layout via cfdisk)" 3>&1 1>&2 2>&3)
 
-while ! ping -c 1 archlinux.org >/dev/null 2>&1; do
-  if whiptail --backtitle "$BACKTITLE" --title "Network Disconnected" --yesno "No active internet connection detected.\n\nZypherOS requires an internet connection to download base packages.\n\nWould you like to open the Network Manager to connect to Wi-Fi?" 14 60; then
-    clear
-    nmtui
-  else
-    clear
-    echo "Installation requires an internet connection. Aborting."
-    exit 1
-  fi
-done
+if [ -z "$PARTITION_METHOD" ]; then
+  clear
+  echo "Installation aborted."
+  exit 1
+fi
 
-whiptail --backtitle "$BACKTITLE" --title "Network Connected" --msgbox "Internet connection established! Proceeding with the setup." 8 50
+if [ "$PARTITION_METHOD" == "2" ]; then
+  whiptail --backtitle "$BACKTITLE" --title "Manual Partitioning" --msgbox "You will now enter cfdisk to partition $TARGET_DRIVE.\n\nPlease create at least:\n1. An EFI System Partition (min 512MB, Type: EFI System)\n2. A Linux Root Partition (Type: Linux filesystem)\n\nRemember to select 'Write' before quitting." 12 60
+  while true; do
+    cfdisk "$TARGET_DRIVE"
 
-# Run Dynamic Timezone and Account Setup Modules
+    echo "Validating partition table..."
+    partprobe "$TARGET_DRIVE"
+    udevadm settle
+    sleep 2
+
+    PARTITIONS=()
+    while read -r name size; do
+      PARTITIONS+=("$name" "$size")
+    done < <(lsblk -r -n -p -o NAME,SIZE "$TARGET_DRIVE" | grep -v "^${TARGET_DRIVE} ")
+
+    if [ ${#PARTITIONS[@]} -lt 4 ]; then
+      if ! whiptail --backtitle "$BACKTITLE" --title "Validation Error" --yesno "You must create at least two partitions (EFI and Root).\n\nReturn to cfdisk?" 10 50; then
+        clear
+        echo "Installation aborted."
+        exit 1
+      fi
+      continue
+    fi
+
+    EFI_PART=$(whiptail --backtitle "$BACKTITLE" --title "Partition Assignment" --menu "Select your EFI (Boot) Partition:\n(This will be formatted as FAT32)" 15 65 6 "${PARTITIONS[@]}" 3>&1 1>&2 2>&3)
+    if [ -z "$EFI_PART" ]; then continue; fi
+
+    ROOT_PART=$(whiptail --backtitle "$BACKTITLE" --title "Partition Assignment" --menu "Select your Linux Root (/) Partition:\n(This will be formatted as BTRFS)" 15 65 6 "${PARTITIONS[@]}" 3>&1 1>&2 2>&3)
+    if [ -z "$ROOT_PART" ]; then continue; fi
+
+    if [ "$EFI_PART" == "$ROOT_PART" ]; then
+      whiptail --backtitle "$BACKTITLE" --title "Validation Error" --msgbox "EFI and Root cannot be the same partition!" 8 50
+      continue
+    fi
+
+    break
+  done
+fi
+
+# --- 4. System Preferences ---
 setup_timezone
 setup_user_account
 
-# Hostname Setup
 while true; do
   HOSTNAME=$(whiptail --backtitle "$BACKTITLE" --title "Network Setup" --inputbox "Enter the system hostname (Computer Name):\n(Lowercase letters, numbers, and hyphens only. No spaces.)" 10 60 "zypheros" 3>&1 1>&2 2>&3)
 
@@ -179,35 +271,38 @@ case $GPU_CHOICE in
 4) GPU_PKG="mesa" ;;
 esac
 
-# Final Point of No Return
-if ! whiptail --backtitle "$BACKTITLE" --title "WARNING: DATA DESTRUCTION" --yesno "You are about to COMPLETELY WIPE the following drive:\n\n$TARGET_DRIVE\n\nAre you absolutely sure you want to proceed?" 12 60; then
+# --- 5. Final Point of No Return ---
+if ! whiptail --backtitle "$BACKTITLE" --title "WARNING: READY TO INSTALL" --yesno "All configuration is complete.\n\nIf you chose Auto-Partitioning, $TARGET_DRIVE will now be wiped.\nIf you chose Manual, your selected partitions will be formatted.\n\nAre you absolutely sure you want to proceed with the installation?" 14 60; then
   clear
   echo "Installation aborted by user."
   exit 1
 fi
 
+# --- 6. Execution: Formatting & Deployment ---
 clear
 echo "========================================="
 echo "   Initiating ZypherOS Deployment...     "
 echo "========================================="
 sleep 2
 
-# --- 3. Universal Partitioning ---
-echo "Wiping and partitioning $TARGET_DRIVE..."
-sgdisk -Z "$TARGET_DRIVE"
-sgdisk -n 1:0:+1M -t 1:ef02 -c 1:"BIOS_BOOT" "$TARGET_DRIVE"
-sgdisk -n 2:0:+1024M -t 2:ef00 -c 2:"EFI" "$TARGET_DRIVE"
-sgdisk -n 3:0:0 -t 3:8300 -c 3:"ROOT" "$TARGET_DRIVE"
+if [ "$PARTITION_METHOD" == "1" ]; then
+  echo "Wiping and auto-partitioning $TARGET_DRIVE..."
+  sgdisk -Z "$TARGET_DRIVE"
+  sgdisk -n 1:0:+1M -t 1:ef02 -c 1:"BIOS_BOOT" "$TARGET_DRIVE"
+  sgdisk -n 2:0:+1024M -t 2:ef00 -c 2:"EFI" "$TARGET_DRIVE"
+  sgdisk -n 3:0:0 -t 3:8300 -c 3:"ROOT" "$TARGET_DRIVE"
 
-partprobe "$TARGET_DRIVE"
-sleep 2
+  partprobe "$TARGET_DRIVE"
+  udevadm settle
+  sleep 2
 
-if [[ "$TARGET_DRIVE" == *"nvme"* ]] || [[ "$TARGET_DRIVE" == *"mmcblk"* ]]; then
-  EFI_PART="${TARGET_DRIVE}p2"
-  ROOT_PART="${TARGET_DRIVE}p3"
-else
-  EFI_PART="${TARGET_DRIVE}2"
-  ROOT_PART="${TARGET_DRIVE}3"
+  if [[ "$TARGET_DRIVE" == *"nvme"* ]] || [[ "$TARGET_DRIVE" == *"mmcblk"* ]]; then
+    EFI_PART="${TARGET_DRIVE}p2"
+    ROOT_PART="${TARGET_DRIVE}p3"
+  else
+    EFI_PART="${TARGET_DRIVE}2"
+    ROOT_PART="${TARGET_DRIVE}3"
+  fi
 fi
 
 echo "Formatting partitions..."
@@ -218,7 +313,6 @@ sync
 udevadm settle
 sleep 2
 
-# --- 4. ZypherOS BTRFS Subvolume Architecture ---
 echo "Building BTRFS subvolumes..."
 mount "$ROOT_PART" /mnt
 btrfs subvolume create /mnt/@
@@ -237,7 +331,6 @@ mount -o "$MNT_OPTS,subvol=@log" "$ROOT_PART" /mnt/var/log
 mount -o "$MNT_OPTS,subvol=@pkg" "$ROOT_PART" /mnt/var/cache/pacman/pkg
 mount "$EFI_PART" /mnt/boot
 
-# --- 4.5. Optimize Live Environment for Speed ---
 echo "Optimizing Live Environment for maximum download speeds..."
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
@@ -249,13 +342,10 @@ echo "Synchronizing package databases..."
 pacman -Sy archlinux-keyring --noconfirm
 pacman -Syy --noconfirm
 
-# --- 4.8. Pre-Pacstrap System Config ---
 mkdir -p /mnt/etc
 echo "KEYMAP=us" >/mnt/etc/vconsole.conf
 
-# --- 5. The Pacstrap ---
 echo "Preparing ZypherOS package lists..."
-# Removed fish, ghostty, and starship - handled by zypheros-ghostty
 ZYPHER_PACKAGES=(
   base base-devel linux linux-lts linux-firmware btrfs-progs sudo networkmanager
   $GPU_PKG limine snapper efibootmgr mtools
@@ -271,17 +361,34 @@ echo "Installing base system and ZypherOS dependencies..."
 pacstrap -K /mnt "${ZYPHER_PACKAGES[@]}"
 genfstab -U /mnt >>/mnt/etc/fstab
 
-# --- 5.5. Stage Skeleton Directory & System Configs ---
-echo "Staging system configurations and user dotfiles (/etc/skel)..."
+if [ "$NET_CHOICE" == "2" ] && [ -n "$STATIC_IP" ]; then
+  echo "Configuring NetworkManager Static IP Profile..."
+  mkdir -p /mnt/etc/NetworkManager/system-connections/
+  cat <<NMEOF >/mnt/etc/NetworkManager/system-connections/Wired_Static.nmconnection
+[connection]
+id=Zypher_Static
+type=ethernet
+match-device=type:ethernet
 
-# Removed ghostty and fish from the skel directory creation
-mkdir -p /mnt/etc/skel/.config/{fastfetch,nvim,discord}
+[ipv4]
+method=manual
+address1=$STATIC_IP,$STATIC_GW
+dns=$STATIC_DNS;
+
+[ipv6]
+method=auto
+NMEOF
+  chmod 600 /mnt/etc/NetworkManager/system-connections/Wired_Static.nmconnection
+fi
+
+echo "Staging system configurations and user dotfiles (/etc/skel)..."
+mkdir -p /mnt/etc/skel/.config/{nvim,discord}
 
 cat <<'SKEL' >/mnt/etc/skel/.config/discord/settings.json
 {
   "SKIP_HOST_UPDATE": true
 }
-
+SKEL
 
 cat <<'SKEL' >/mnt/etc/skel/.config/kdeglobals
 [General]
@@ -297,25 +404,19 @@ SKEL
 
 echo "TERMINAL=ghostty" >>/mnt/etc/environment
 
-# --- 6. The Chroot Handoff ---
 echo "Generating internal configuration script..."
-
 cat <<EOF >/mnt/zypher_chroot.sh
 #!/bin/bash
 echo "$HOSTNAME" > /etc/hostname
-# Injects the user's selected Timezone dynamically
 ln -sf /usr/share/zoneinfo/$SELECTED_TIMEZONE /etc/localtime
 hwclock --systohc
 sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
-# --- ZypherOS Repo Pivot (Injecting Custom Repos) ---
 echo "Pivoting system to ZypherOS Custom Repositories..."
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
-
-# Prevent official Arch updates from overwriting ZypherOS identity files
 echo "NoExtract = etc/os-release etc/issue etc/issue.net" >> /etc/pacman.conf
 
 if ! head -n 5 /etc/pacman.d/mirrorlist | grep -q "repo.zyphersystems.com"; then
@@ -332,10 +433,7 @@ REPOEOF
 fi
 
 pacman -Sy
-
-# Install the ZypherOS release package and force identity takeover
 pacman -S --noconfirm --overwrite="*" zypheros-release zypheros-ghostty zypheros-fastfetch
-# ----------------------------------------------------
 
 echo "Configuring SDDM Login Screen background and themes..."
 mkdir -p /etc/sddm.conf.d
@@ -357,15 +455,11 @@ echo "Cloning LazyVim profile..."
 git clone https://github.com/zypher-systems/nvim-config.git /etc/skel/.config/nvim
 rm -rf /etc/skel/.config/nvim/.git
 
-# ==========================================
-# Create User
-# ==========================================
 useradd -m -c "$FULL_NAME" -G wheel -s /usr/bin/fish $USERNAME
 echo "$USERNAME:$PASSWORD" | chpasswd
 echo "root:$PASSWORD" | chpasswd
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
-# --- POST-USERADD ABSOLUTE SCRIPT INJECTION ---
 echo "Staging bulletproof hardcoded DBus script for first login..."
 mkdir -p /home/$USERNAME/.local/bin
 mkdir -p /home/$USERNAME/.config/autostart
@@ -420,7 +514,6 @@ sed -i "s/ZYPHERUSER/$USERNAME/g" /home/$USERNAME/.config/autostart/zypher-brand
 
 chown -R $USERNAME:$USERNAME /home/$USERNAME/.config
 chown -R $USERNAME:$USERNAME /home/$USERNAME/.local
-# ==========================================
 
 mkdir -p /var/lib/sddm/.config
 cp /etc/skel/.config/kdeglobals /var/lib/sddm/.config/kdeglobals
@@ -429,7 +522,6 @@ chown -R sddm:sddm /var/lib/sddm/.config
 echo "Bootstrapping Neovim plugins for $USERNAME..."
 sudo -u "$USERNAME" nvim --headless "+Lazy! sync" +qa >/dev/null 2>&1 || true
 
-# --- Install yay (AUR Helper) ---
 echo "Installing yay and AUR packages..."
 useradd -m -s /bin/bash builduser
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
@@ -440,14 +532,20 @@ sudo -u builduser bash -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm
 
 rm /etc/sudoers.d/builduser
 userdel -r builduser
-# ------------------------------------------------
 
 systemctl enable NetworkManager
 systemctl enable sddm
 systemctl enable bluetooth
 
+echo "Initializing Snapper Architecture..."
+umount /.snapshots 2>/dev/null || true
+rm -rf /.snapshots
 snapper -c root create-config /
+btrfs subvolume delete /.snapshots
+mkdir /.snapshots
+mount -a
 snapper -c home create-config /home
+
 chmod 750 /.snapshots
 chmod 750 /home/.snapshots
 
@@ -482,7 +580,6 @@ chmod +x /mnt/zypher_chroot.sh
 echo "Entering Chroot to finalize system..."
 arch-chroot /mnt /zypher_chroot.sh
 
-# --- 7. Clean Up ---
 rm /mnt/zypher_chroot.sh
 umount -R /mnt
 
