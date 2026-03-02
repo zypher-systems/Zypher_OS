@@ -55,13 +55,44 @@ setup_user_account() {
 
   DEFAULT_USER=$(echo "$FULL_NAME" | awk '{if (NF==1) print $1; else print substr($1,1,1) $NF}' | tr '[:upper:]' '[:lower:]')
 
-  USERNAME=$(whiptail --backtitle "$BACKTITLE" --title "Account Setup" \
-    --inputbox "Confirm or edit your username:\n(Lowercase letters, numbers, hyphens only.)" 10 60 "$DEFAULT_USER" 3>&1 1>&2 2>&3)
-  if [ -z "$USERNAME" ]; then
-    clear
-    echo "Installation canceled."
-    exit 1
-  fi
+  # --- USERNAME VALIDATION LOOP ---
+  while true; do
+    USERNAME=$(whiptail --backtitle "$BACKTITLE" --title "Account Setup" \
+      --inputbox "Confirm or edit your username:\n(Lowercase letters, numbers, hyphens only.)" 10 60 "$DEFAULT_USER" 3>&1 1>&2 2>&3)
+
+    # Catch if they hit 'Cancel' or 'ESC'
+    if [ $? -ne 0 ]; then
+      clear
+      echo "Installation canceled."
+      exit 1
+    fi
+
+    # Convert to lowercase to catch 'Root', 'ROOT', etc.
+    USERNAME=$(echo "$USERNAME" | tr '[:upper:]' '[:lower:]')
+
+    # 1. Check if empty
+    if [ -z "$USERNAME" ]; then
+      whiptail --backtitle "$BACKTITLE" --title "Invalid Username" --msgbox "Username cannot be empty. Please try again." 8 50
+      continue
+    fi
+
+    # 2. Check if trying to be root
+    if [ "$USERNAME" == "root" ]; then
+      whiptail --backtitle "$BACKTITLE" --title "Invalid Username" --msgbox "Security Error: You cannot use 'root' as your daily driver account. Please choose a standard username." 10 60
+      DEFAULT_USER="" # Clears the default so they have to type something else
+      continue
+    fi
+
+    # 3. Enforce standard Linux username rules
+    if [[ ! "$USERNAME" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+      whiptail --backtitle "$BACKTITLE" --title "Invalid Username" --msgbox "Invalid format. Use only lowercase letters, numbers, hyphens, and underscores." 8 60
+      continue
+    fi
+
+    # If all checks pass, break the loop
+    break
+  done
+  # --------------------------------
 
   while true; do
     PASSWORD=$(whiptail --backtitle "$BACKTITLE" --title "Security Setup" \
