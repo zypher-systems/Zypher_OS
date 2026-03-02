@@ -261,7 +261,7 @@ ZYPHER_PACKAGES=(
   $GPU_PKG limine snapper efibootmgr mtools
   plasma sddm pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil
   dolphin ark spectacle kate gwenview okular partitionmanager
-  git fastfetch neovim zoxide thefuck eza bat btop nano fzf yazi
+  git neovim zoxide thefuck eza bat btop nano fzf yazi
   lazygit ripgrep fd unzip wget xclip wl-clipboard firefox
   libreoffice-fresh pika-backup thunderbird
   ttf-meslo-nerd noto-fonts noto-fonts-emoji
@@ -281,94 +281,7 @@ cat <<'SKEL' >/mnt/etc/skel/.config/discord/settings.json
 {
   "SKIP_HOST_UPDATE": true
 }
-SKEL
 
-cat <<'SKEL' >/mnt/etc/skel/.config/fastfetch/config.jsonc
-{
-    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
-    "logo": {
-        "type": "file",
-        "source": "/usr/share/zypheros/branding/logo.txt",
-        "padding": {
-            "top": 1,
-            "left": 2,
-            "right": 2
-        }
-    },
-    "modules": [
-        "break",
-        {
-            "type": "custom",
-            "format": "\u001b[1;32m╭──────────────────────── \u001b[1;97mHardware\u001b[1;32m ────────────────────────╮"
-        },
-        { "type": "host", "key": "\u001b[1;32m│ \u001b[1;97m \u001b[1;32mPC", "keyColor": "bright_green" },
-        { "type": "cpu", "key": "\u001b[1;32m│ \u001b[1;97m \u001b[1;32mCPU", "keyColor": "bright_green" },
-        { "type": "gpu", "key": "\u001b[1;32m│ \u001b[1;97m \u001b[1;32mGPU", "keyColor": "bright_green" },
-        { "type": "memory", "key": "\u001b[1;32m│ \u001b[1;97m \u001b[1;32mRAM", "keyColor": "bright_green" },
-        { "type": "disk", "key": "\u001b[1;32m│ \u001b[1;97m \u001b[1;32mStorage", "keyColor": "bright_green" },
-        {
-            "type": "custom",
-            "format": "\u001b[1;32m╰──────────────────────────────────────────────────────────╯"
-        },
-        "break",
-        {
-            "type": "custom",
-            "format": "\u001b[1;33m╭──────────────────────── \u001b[1;97mSoftware\u001b[1;33m ────────────────────────╮"
-        },
-        { "type": "os", "key": "\u001b[1;33m│ \u001b[1;97m \u001b[1;33mOS", "keyColor": "bright_yellow" },
-        { "type": "kernel", "key": "\u001b[1;33m│ \u001b[1;97m \u001b[1;33mKernel", "keyColor": "bright_yellow" },
-        { "type": "bios", "key": "\u001b[1;33m│ \u001b[1;97m \u001b[1;33mBIOS", "keyColor": "bright_yellow" },
-        { "type": "packages", "key": "\u001b[1;33m│ \u001b[1;97m \u001b[1;33mPackages", "keyColor": "bright_yellow" },
-        { "type": "shell", "key": "\u001b[1;33m│ \u001b[1;97m \u001b[1;33mShell", "keyColor": "bright_yellow" },
-        {
-            "type": "custom",
-            "format": "\u001b[1;33m╰──────────────────────────────────────────────────────────╯"
-        },
-        "break",
-        {
-            "type": "custom",
-            "format": "\u001b[1;34m╭─────────────────── \u001b[1;97mDesktop Environment\u001b[1;34m ──────────────────╮"
-        },
-        { "type": "de", "key": "\u001b[1;34m│ \u001b[1;97m \u001b[1;34mDE", "keyColor": "bright_blue" },
-        { "type": "lm", "key": "\u001b[1;34m│ \u001b[1;97m \u001b[1;34mLogin Manager", "keyColor": "bright_blue" },
-        { "type": "wm", "key": "\u001b[1;34m│ \u001b[1;97m \u001b[1;34mWindow Manager", "keyColor": "bright_blue" },
-        { "type": "wmtheme", "key": "\u001b[1;34m│ \u001b[1;97m \u001b[1;34mTheme", "keyColor": "bright_blue" },
-        { "type": "terminal", "key": "\u001b[1;34m│ \u001b[1;97m \u001b[1;34mTerminal", "keyColor": "bright_blue" },
-        {
-            "type": "custom",
-            "format": "\u001b[1;34m╰──────────────────────────────────────────────────────────╯"
-        },
-        "break",
-        {
-            "type": "custom",
-            "format": "\u001b[1;35m╭─────────────────── \u001b[1;97mNetwork & System\u001b[1;35m ───────────────────╮"
-        },
-        { "type": "localip", "key": "\u001b[1;35m│ \u001b[1;97m \u001b[1;35mLocal IP", "keyColor": "bright_magenta" },
-        { "type": "wifi", "key": "\u001b[1;35m│ \u001b[1;97m \u001b[1;35mWiFi", "keyColor": "bright_magenta" },
-        {
-            "type": "command",
-            "key": "\u001b[1;35m│ \u001b[1;97m \u001b[1;35mOS Age",
-            "keyColor": "bright_magenta",
-            "text": "birth_install=$(stat -c %W /); current=$(date +%s); time_progression=$((current - birth_install)); days_difference=$((time_progression / 86400)); echo $days_difference days"
-        },
-        { "type": "uptime", "key": "\u001b[1;35m│ \u001b[1;97m \u001b[1;35mUptime", "keyColor": "bright_magenta" },
-        { "type": "datetime", "key": "\u001b[1;35m│ \u001b[1;97m \u001b[1;35mDateTime", "keyColor": "bright_magenta" },
-        {
-            "type": "custom",
-            "format": "\u001b[1;35m╰────────────────────────────────────────────────────────╯"
-        },
-        "break",
-        {
-            "type": "custom",
-            "format": "\u001b[1;90m                    ╭─ \u001b[1;97mPowered by Zypher Systems\u001b[1;90m ─╮"
-        },
-        {
-            "type": "custom",
-            "format": "\u001b[1;90m                    ╰─ \u001b[1;97mCustom Fastfetch Config\u001b[1;90m ───╯"
-        }
-    ]
-}
-SKEL
 
 cat <<'SKEL' >/mnt/etc/skel/.config/kdeglobals
 [General]
@@ -421,7 +334,7 @@ fi
 pacman -Sy
 
 # Install the ZypherOS release package and force identity takeover
-pacman -S --noconfirm --overwrite="*" zypheros-release zypheros-ghostty
+pacman -S --noconfirm --overwrite="*" zypheros-release zypheros-ghostty zypheros-fastfetch
 # ----------------------------------------------------
 
 echo "Configuring SDDM Login Screen background and themes..."
