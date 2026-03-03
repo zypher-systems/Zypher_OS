@@ -266,6 +266,46 @@ while true; do
   fi
 done
 
+# --- ZRAM SWAP CONFIGURATION ---
+ZRAM_CHOICE=$(whiptail --backtitle "$BACKTITLE" --title "ZRAM Swap Configuration" --menu "Select your ZRAM (Compressed Swap) size:\n(Dynamically scales based on total system physical RAM)" 16 65 4 \
+  "1" "50% of RAM (Recommended for most workloads)" \
+  "2" "25% of RAM (For machines with 32GB+ RAM)" \
+  "3" "100% of RAM (For low-RAM or heavy compiling)" \
+  "4" "Disable ZRAM (No swap space)" 3>&1 1>&2 2>&3)
+
+case $ZRAM_CHOICE in
+1) ZRAM_SIZE="ram / 2" ;;
+2) ZRAM_SIZE="ram / 4" ;;
+3) ZRAM_SIZE="ram" ;;
+4) ZRAM_SIZE="none" ;;
+*) ZRAM_SIZE="ram / 2" ;; # Failsafe
+esac
+
+# --- SSH SERVER CONFIGURATION ---
+if whiptail --backtitle "$BACKTITLE" --title "Remote Access" --yesno "Would you like to enable the SSH Server (sshd) on boot?\n\n(Recommended if you plan to remotely manage this machine)" 10 60; then
+  ENABLE_SSH="true"
+else
+  ENABLE_SSH="false"
+fi
+
+# --- SMART CPU AUTO-DETECT (MICROCODE) ---
+echo -e "\nDetecting CPU Architecture for Microcode..."
+CPU_VENDOR=$(grep vendor_id /proc/cpuinfo | head -n 1 | awk '{print $3}')
+
+if [ "$CPU_VENDOR" == "AuthenticAMD" ]; then
+  UCODE_PKG="amd-ucode"
+  UCODE_IMG="amd-ucode.img"
+  echo "Detected AMD CPU. Queuing amd-ucode."
+elif [ "$CPU_VENDOR" == "GenuineIntel" ]; then
+  UCODE_PKG="intel-ucode"
+  UCODE_IMG="intel-ucode.img"
+  echo "Detected Intel CPU. Queuing intel-ucode."
+else
+  UCODE_PKG=""
+  UCODE_IMG=""
+  echo "Virtual/Unknown CPU detected. Skipping microcode."
+fi
+
 # Smart GPU Auto-Detect
 GPU_VENDOR=$(lspci -vnn | grep -iE 'VGA|3D' | grep -iE 'NVIDIA|AMD|Advanced Micro Devices|Intel' | head -n 1)
 if echo "$GPU_VENDOR" | grep -iq "NVIDIA"; then
@@ -296,9 +336,9 @@ if [ -z "$GPU_CHOICE" ]; then
 fi
 
 case $GPU_CHOICE in
-1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon amd-ucode" ;;
+1) GPU_PKG="mesa xf86-video-amdgpu vulkan-radeon" ;;
 2) GPU_PKG="nvidia nvidia-utils" ;;
-3) GPU_PKG="mesa xf86-video-intel vulkan-intel intel-ucode" ;;
+3) GPU_PKG="mesa xf86-video-intel vulkan-intel" ;;
 4) GPU_PKG="mesa" ;;
 esac
 
@@ -366,8 +406,8 @@ echo "Optimizing Live Environment for maximum download speeds..."
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
 
-echo "Fetching Arch Linux Global CDN..."
-echo 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' >/etc/pacman.d/mirrorlist
+echo "Hunting for the fastest Arch mirrors..."
+reflector --country US --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
 
 echo "Synchronizing package databases..."
 pacman -Sy archlinux-keyring --noconfirm
@@ -379,7 +419,7 @@ echo "KEYMAP=us" >/mnt/etc/vconsole.conf
 echo "Preparing ZypherOS package lists..."
 ZYPHER_PACKAGES=(
   base base-devel linux linux-lts linux-firmware btrfs-progs sudo networkmanager
-  $GPU_PKG limine snapper efibootmgr mtools
+  $GPU_PKG $UCODE_PKG limine snapper efibootmgr mtools zram-generator openssh reflector
   plasma sddm pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil
   dolphin ark spectacle kate gwenview okular partitionmanager
   git neovim zoxide thefuck eza bat btop nano fzf yazi
@@ -444,6 +484,16 @@ hwclock --systohc
 sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
+
+echo "Configuring ZRAM"
+if [ "$ZRAM_SIZE" != "none" ]; then
+    echo "Configuring ZRAM for performance..."
+    mkdir -p /etc/systemd/
+    cat <<ZRAMEOF > /etc/systemd/zram-generator.conf
+[zram0]
+zram-size = $ZRAM_SIZE
+ZRAMEOF
+fi
 
 echo "Pivoting system to ZypherOS Custom Repositories..."
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
@@ -567,6 +617,9 @@ userdel -r builduser
 systemctl enable NetworkManager
 systemctl enable sddm
 systemctl enable bluetooth
+if [ "$ENABLE_SSH" == "true" ]; then
+    systemctl enable sshd
+fi
 
 echo "Initializing Snapper Architecture..."
 umount /.snapshots 2>/dev/null || true
@@ -589,12 +642,19 @@ echo "" >> /boot/limine.conf
 echo "/ZypherOS" >> /boot/limine.conf
 echo "    protocol: linux" >> /boot/limine.conf
 echo "    kernel_path: boot():/vmlinuz-linux" >> /boot/limine.conf
+if [ -n "$UCODE_IMG" ]; then
+    echo "    module_path: boot():/$UCODE_IMG" >> /boot/limine.conf
+fi
 echo "    module_path: boot():/initramfs-linux.img" >> /boot/limine.conf
 echo "    cmdline: root=UUID=\$(blkid -s UUID -o value $ROOT_PART) rootflags=subvol=@ rw" >> /boot/limine.conf
+
 echo "" >> /boot/limine.conf
 echo "/ZypherOS (LTS Kernel)" >> /boot/limine.conf
 echo "    protocol: linux" >> /boot/limine.conf
 echo "    kernel_path: boot():/vmlinuz-linux-lts" >> /boot/limine.conf
+if [ -n "$UCODE_IMG" ]; then
+    echo "    module_path: boot():/$UCODE_IMG" >> /boot/limine.conf
+fi
 echo "    module_path: boot():/initramfs-linux-lts.img" >> /boot/limine.conf
 echo "    cmdline: root=UUID=\$(blkid -s UUID -o value $ROOT_PART) rootflags=subvol=@ rw" >> /boot/limine.conf
 
