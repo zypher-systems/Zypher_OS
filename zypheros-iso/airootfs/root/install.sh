@@ -14,7 +14,7 @@ cleanup_on_fail() {
 trap cleanup_on_fail ERR INT TERM
 
 # --- TUI MODULES ---
-BACKTITLE="ZypherOS Installer - v0.1.3 Alpha"
+BACKTITLE="ZypherOS Installer - 0.1.4 Alpha"
 
 setup_timezone() {
   REGION=$(whiptail --backtitle "$BACKTITLE" --title "Timezone Selection" --menu "Select your region:" 15 50 8 \
