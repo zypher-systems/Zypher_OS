@@ -639,7 +639,7 @@ cp /usr/share/limine/limine-bios.sys /boot/
 
 echo "timeout: 5" > /boot/limine.conf
 echo "" >> /boot/limine.conf
-echo "/ZypherOS" >> /boot/limine.conf
+echo "/ZypherOS (linux)" >> /boot/limine.conf
 echo "    protocol: linux" >> /boot/limine.conf
 echo "    kernel_path: boot():/vmlinuz-linux" >> /boot/limine.conf
 if [ -n "$UCODE_IMG" ]; then
@@ -649,7 +649,7 @@ echo "    module_path: boot():/initramfs-linux.img" >> /boot/limine.conf
 echo "    cmdline: root=UUID=\$(blkid -s UUID -o value $ROOT_PART) rootflags=subvol=@ rw" >> /boot/limine.conf
 
 echo "" >> /boot/limine.conf
-echo "/ZypherOS (LTS Kernel)" >> /boot/limine.conf
+echo "/ZypherOS (linux-lts)" >> /boot/limine.conf
 echo "    protocol: linux" >> /boot/limine.conf
 echo "    kernel_path: boot():/vmlinuz-linux-lts" >> /boot/limine.conf
 if [ -n "$UCODE_IMG" ]; then
