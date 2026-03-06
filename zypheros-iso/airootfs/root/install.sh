@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -o pipefail # CRITICAL FIX: Ensures pipeline errors trigger the failsafe trap
 
 # --- 0. Pre-Flight Cleanup & Failsafes ---
 umount -R /mnt/boot 2>/dev/null || true
@@ -23,7 +24,7 @@ cleanup_on_fail() {
 trap cleanup_on_fail ERR INT TERM
 
 # --- TUI MODULES ---
-BACKTITLE="ZypherOS Installer - 0.1.5 Alpha"
+BACKTITLE="ZypherOS Installer - 0.2.0 Alpha"
 
 setup_timezone() {
   REGION=$(whiptail --backtitle "$BACKTITLE" --title "Timezone Selection" --menu "Select your region:" 15 50 8 \
@@ -114,7 +115,7 @@ fi
 whiptail --backtitle "$BACKTITLE" --title "ZypherOS Installer" --msgbox "Welcome to the ZypherOS Installer.\n\n$FIRMWARE_MSG\n\nPress Enter to begin the setup process." 12 60
 
 # --- 2. Dynamic Network Setup ---
-NET_IFACE=$(ip -o link show | awk -F': ' '{print $2}' | grep -v lo | head -n 1)
+NET_IFACE=$(ip -o link show | awk -F': ' '{print $2}' | grep -v lo | head -n 1 || true)
 while true; do
   if ping -c 1 -W 2 archlinux.org >/dev/null 2>&1; then
     NET_STATUS="Connected"
@@ -162,7 +163,7 @@ fi
 
 FS_CHOICE=$(whiptail --backtitle "$BACKTITLE" --title "Filesystem Selection" --menu "Choose your root filesystem format:" 15 65 3 \
   "btrfs" "BTRFS (Recommended - Enables Snapper Rollbacks)" \
-  "ext4" "Ext4 (Traditional, Rock Solid, No Snapshots)" \
+  "ext4" "Ext4 (Traditional, Rock Solid, No snapshots)" \
   "xfs" "XFS (High Performance, No Snapshots)" 3>&1 1>&2 2>&3)
 if [ -z "$FS_CHOICE" ]; then
   clear
@@ -254,7 +255,8 @@ else
   UCODE_IMG=""
 fi
 
-GPU_VENDOR=$(lspci -vnn | grep -iE 'VGA|3D' | grep -iE 'NVIDIA|AMD|Intel' | head -n 1)
+# THE FIX: Added || true so grep doesn't crash the script when run inside a VM
+GPU_VENDOR=$(lspci -vnn | grep -iE 'VGA|3D' | grep -iE 'NVIDIA|AMD|Intel' | head -n 1 || true)
 if echo "$GPU_VENDOR" | grep -iq "NVIDIA"; then
   DEFAULT="2"
 elif echo "$GPU_VENDOR" | grep -iq "AMD"; then
@@ -297,124 +299,157 @@ fi
 
 # --- 6. Execution: Formatting & Deployment ---
 clear
-echo "========================================="
-echo "   Initiating ZypherOS Deployment...     "
-echo "========================================="
-sleep 2
+LOG_FILE="/tmp/zypheros-install.log"
+>"$LOG_FILE" # Clear any previous logs
 
-if [ "$PARTITION_METHOD" == "1" ]; then
-  echo "Wiping and auto-partitioning $TARGET_DRIVE..."
-  sgdisk -Z "$TARGET_DRIVE"
-  sgdisk -n 1:0:+1M -t 1:ef02 -c 1:"BIOS_BOOT" "$TARGET_DRIVE"
-  sgdisk -n 2:0:+1024M -t 2:ef00 -c 2:"EFI" "$TARGET_DRIVE"
+{
+  echo 5
+  echo "XXX"
+  echo "Preparing drives and clearing signatures..."
+  echo "XXX"
 
-  if [ "$SWAP_CHOICE" -gt 0 ]; then
-    sgdisk -n 3:0:+${SWAP_CHOICE}G -t 3:8200 -c 3:"SWAP" "$TARGET_DRIVE"
-    sgdisk -n 4:0:0 -t 4:8300 -c 4:"ROOT" "$TARGET_DRIVE"
-  else
-    sgdisk -n 3:0:0 -t 3:8300 -c 3:"ROOT" "$TARGET_DRIVE"
+  if [ "$PARTITION_METHOD" == "1" ]; then
+    sgdisk -Z "$TARGET_DRIVE" >>"$LOG_FILE" 2>&1
+    sgdisk -n 1:0:+1M -t 1:ef02 -c 1:"BIOS_BOOT" "$TARGET_DRIVE" >>"$LOG_FILE" 2>&1
+    sgdisk -n 2:0:+1024M -t 2:ef00 -c 2:"EFI" "$TARGET_DRIVE" >>"$LOG_FILE" 2>&1
+
+    if [ "$SWAP_CHOICE" -gt 0 ]; then
+      sgdisk -n 3:0:+${SWAP_CHOICE}G -t 3:8200 -c 3:"SWAP" "$TARGET_DRIVE" >>"$LOG_FILE" 2>&1
+      sgdisk -n 4:0:0 -t 4:8300 -c 4:"ROOT" "$TARGET_DRIVE" >>"$LOG_FILE" 2>&1
+    else
+      sgdisk -n 3:0:0 -t 3:8300 -c 3:"ROOT" "$TARGET_DRIVE" >>"$LOG_FILE" 2>&1
+    fi
+
+    partprobe "$TARGET_DRIVE" >>"$LOG_FILE" 2>&1
+    udevadm settle
+    sleep 2
+    if [[ "$TARGET_DRIVE" == *"nvme"* ]] || [[ "$TARGET_DRIVE" == *"mmcblk"* ]]; then
+      EFI_PART="${TARGET_DRIVE}p2"
+      if [ "$SWAP_CHOICE" -gt 0 ]; then
+        SWAP_PART="${TARGET_DRIVE}p3"
+        ROOT_PART="${TARGET_DRIVE}p4"
+      else ROOT_PART="${TARGET_DRIVE}p3"; fi
+    else
+      EFI_PART="${TARGET_DRIVE}2"
+      if [ "$SWAP_CHOICE" -gt 0 ]; then
+        SWAP_PART="${TARGET_DRIVE}3"
+        ROOT_PART="${TARGET_DRIVE}4"
+      else ROOT_PART="${TARGET_DRIVE}3"; fi
+    fi
   fi
 
-  partprobe "$TARGET_DRIVE"
-  udevadm settle
-  sleep 2
-  if [[ "$TARGET_DRIVE" == *"nvme"* ]] || [[ "$TARGET_DRIVE" == *"mmcblk"* ]]; then
-    EFI_PART="${TARGET_DRIVE}p2"
-    if [ "$SWAP_CHOICE" -gt 0 ]; then
-      SWAP_PART="${TARGET_DRIVE}p3"
-      ROOT_PART="${TARGET_DRIVE}p4"
-    else ROOT_PART="${TARGET_DRIVE}p3"; fi
-  else
-    EFI_PART="${TARGET_DRIVE}2"
-    if [ "$SWAP_CHOICE" -gt 0 ]; then
-      SWAP_PART="${TARGET_DRIVE}3"
-      ROOT_PART="${TARGET_DRIVE}4"
-    else ROOT_PART="${TARGET_DRIVE}3"; fi
+  # Scrub old filesystem signatures (Ghost LUKS/Ext4 headers)
+  wipefs -af "$EFI_PART" >>"$LOG_FILE" 2>&1 || true
+  if [ "$SWAP_CHOICE" -gt 0 ] && [ -n "$SWAP_PART" ]; then wipefs -af "$SWAP_PART" >>"$LOG_FILE" 2>&1 || true; fi
+  wipefs -af "$ROOT_PART" >>"$LOG_FILE" 2>&1 || true
+
+  echo 15
+  echo "XXX"
+  echo "Formatting filesystems ($FS_CHOICE)..."
+  echo "XXX"
+
+  if [ "$SWAP_CHOICE" -gt 0 ] && [ -n "$SWAP_PART" ]; then
+    mkswap "$SWAP_PART" >>"$LOG_FILE" 2>&1
+    swapon "$SWAP_PART" >>"$LOG_FILE" 2>&1
   fi
-fi
 
-# Scrub old filesystem signatures (Ghost LUKS/Ext4 headers)
-echo "Scrubbing old filesystem signatures..."
-wipefs -af "$EFI_PART" 2>/dev/null || true
-if [ "$SWAP_CHOICE" -gt 0 ] && [ -n "$SWAP_PART" ]; then wipefs -af "$SWAP_PART" 2>/dev/null || true; fi
-wipefs -af "$ROOT_PART" 2>/dev/null || true
+  mkfs.vfat -F32 "$EFI_PART" >>"$LOG_FILE" 2>&1
 
-if [ "$SWAP_CHOICE" -gt 0 ] && [ -n "$SWAP_PART" ]; then
-  echo "Formatting and enabling Physical Swap..."
-  mkswap "$SWAP_PART"
-  swapon "$SWAP_PART"
-fi
+  if [ "$ENCRYPT_CHOICE" == "true" ]; then
+    echo 20
+    echo "XXX"
+    echo "Securing drive with LUKS2 Encryption..."
+    echo "XXX"
+    echo -n "$LUKS_PASS" | cryptsetup -q luksFormat "$ROOT_PART" - >>"$LOG_FILE" 2>&1
+    echo -n "$LUKS_PASS" | cryptsetup open "$ROOT_PART" cryptroot - >>"$LOG_FILE" 2>&1
+    ACTUAL_ROOT="/dev/mapper/cryptroot"
+    CRYPT_PKG="cryptsetup"
+  else
+    ACTUAL_ROOT="$ROOT_PART"
+    CRYPT_PKG=""
+  fi
 
-echo "Formatting EFI..."
-mkfs.vfat -F32 "$EFI_PART"
+  if [ "$FS_CHOICE" == "btrfs" ]; then
+    mkfs.btrfs -f "$ACTUAL_ROOT" >>"$LOG_FILE" 2>&1
+    mount "$ACTUAL_ROOT" /mnt
+    btrfs subvolume create /mnt/@ >>"$LOG_FILE" 2>&1
+    btrfs subvolume create /mnt/@home >>"$LOG_FILE" 2>&1
+    btrfs subvolume create /mnt/@log >>"$LOG_FILE" 2>&1
+    btrfs subvolume create /mnt/@pkg >>"$LOG_FILE" 2>&1
+    umount /mnt
+    MNT_OPTS="noatime,compress=zstd,space_cache=v2"
+    mount -o "$MNT_OPTS,subvol=@" "$ACTUAL_ROOT" /mnt
+    mkdir -p /mnt/{home,var/log,var/cache/pacman/pkg,boot}
+    mount -o "$MNT_OPTS,subvol=@home" "$ACTUAL_ROOT" /mnt/home
+    mount -o "$MNT_OPTS,subvol=@log" "$ACTUAL_ROOT" /mnt/var/log
+    mount -o "$MNT_OPTS,subvol=@pkg" "$ACTUAL_ROOT" /mnt/var/cache/pacman/pkg
+    FS_PKG="btrfs-progs snapper"
+  elif [ "$FS_CHOICE" == "ext4" ]; then
+    mkfs.ext4 -F "$ACTUAL_ROOT" >>"$LOG_FILE" 2>&1
+    mount "$ACTUAL_ROOT" /mnt
+    mkdir -p /mnt/boot
+    FS_PKG="e2fsprogs"
+  elif [ "$FS_CHOICE" == "xfs" ]; then
+    mkfs.xfs -f "$ACTUAL_ROOT" >>"$LOG_FILE" 2>&1
+    mount "$ACTUAL_ROOT" /mnt
+    mkdir -p /mnt/boot
+    FS_PKG="xfsprogs"
+  fi
 
-if [ "$ENCRYPT_CHOICE" == "true" ]; then
-  echo "Encrypting Root Partition with LUKS2..."
-  echo -n "$LUKS_PASS" | cryptsetup -q luksFormat "$ROOT_PART" -
-  echo -n "$LUKS_PASS" | cryptsetup open "$ROOT_PART" cryptroot -
-  ACTUAL_ROOT="/dev/mapper/cryptroot"
-  CRYPT_PKG="cryptsetup"
-else
-  ACTUAL_ROOT="$ROOT_PART"
-  CRYPT_PKG=""
-fi
+  mount "$EFI_PART" /mnt/boot
 
-echo "Formatting Root Partition as $FS_CHOICE..."
-if [ "$FS_CHOICE" == "btrfs" ]; then
-  mkfs.btrfs -f "$ACTUAL_ROOT"
-  mount "$ACTUAL_ROOT" /mnt
-  btrfs subvolume create /mnt/@
-  btrfs subvolume create /mnt/@home
-  btrfs subvolume create /mnt/@log
-  btrfs subvolume create /mnt/@pkg
-  umount /mnt
-  MNT_OPTS="noatime,compress=zstd,space_cache=v2"
-  mount -o "$MNT_OPTS,subvol=@" "$ACTUAL_ROOT" /mnt
-  mkdir -p /mnt/{home,var/log,var/cache/pacman/pkg,boot}
-  mount -o "$MNT_OPTS,subvol=@home" "$ACTUAL_ROOT" /mnt/home
-  mount -o "$MNT_OPTS,subvol=@log" "$ACTUAL_ROOT" /mnt/var/log
-  mount -o "$MNT_OPTS,subvol=@pkg" "$ACTUAL_ROOT" /mnt/var/cache/pacman/pkg
-  FS_PKG="btrfs-progs snapper"
-elif [ "$FS_CHOICE" == "ext4" ]; then
-  mkfs.ext4 -F "$ACTUAL_ROOT"
-  mount "$ACTUAL_ROOT" /mnt
-  mkdir -p /mnt/boot
-  FS_PKG="e2fsprogs"
-elif [ "$FS_CHOICE" == "xfs" ]; then
-  mkfs.xfs -f "$ACTUAL_ROOT"
-  mount "$ACTUAL_ROOT" /mnt
-  mkdir -p /mnt/boot
-  FS_PKG="xfsprogs"
-fi
+  echo 30
+  echo "XXX"
+  echo "Optimizing download mirrors..."
+  echo "XXX"
+  reflector --country US --latest 5 --sort rate --save /etc/pacman.d/mirrorlist >>"$LOG_FILE" 2>&1
+  pacman -Sy archlinux-keyring --noconfirm >>"$LOG_FILE" 2>&1
+  pacman -Syy --noconfirm >>"$LOG_FILE" 2>&1
 
-mount "$EFI_PART" /mnt/boot
+  mkdir -p /mnt/etc
+  echo "KEYMAP=us" >/mnt/etc/vconsole.conf
 
-echo "Hunting for fastest Arch mirrors..."
-reflector --country US --latest 5 --sort rate --save /etc/pacman.d/mirrorlist
-pacman -Sy archlinux-keyring --noconfirm
-pacman -Syy --noconfirm
+  # We break the massive payload into logical chunks so the progress bar actually moves.
+  CORE_PKGS=(
+    base base-devel $KERNEL_PKG linux-lts linux-lts-headers linux-firmware sudo networkmanager
+    $FS_PKG $CRYPT_PKG $GPU_PKG $UCODE_PKG limine efibootmgr mtools zram-generator openssh reflector
+  )
 
-mkdir -p /mnt/etc
-echo "KEYMAP=us" >/mnt/etc/vconsole.conf
+  DESKTOP_PKGS=(
+    plasma-meta sddm pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil
+    dolphin ark spectacle kate gwenview okular partitionmanager
+  )
 
-ZYPHER_PACKAGES=(
-  base base-devel $KERNEL_PKG linux-lts linux-lts-headers linux-firmware sudo networkmanager
-  $FS_PKG $CRYPT_PKG $GPU_PKG $UCODE_PKG limine efibootmgr mtools zram-generator openssh reflector
-  plasma sddm pipewire wireplumber pipewire-pulse bluez bluez-utils bluedevil
-  dolphin ark spectacle kate gwenview okular partitionmanager
-  git neovim zoxide thefuck eza bat btop nano fzf yazi fish
-  lazygit ripgrep fd unzip wget xclip wl-clipboard firefox
-  libreoffice-fresh pika-backup thunderbird ttf-meslo-nerd noto-fonts noto-fonts-emoji
-)
+  TOOL_PKGS=(
+    git neovim zoxide thefuck eza bat btop nano fzf yazi fish
+    lazygit ripgrep fd unzip wget xclip wl-clipboard firefox
+    libreoffice-fresh pika-backup thunderbird ttf-meslo-nerd noto-fonts noto-fonts-emoji
+  )
 
-echo "Installing base system..."
-pacstrap -K /mnt "${ZYPHER_PACKAGES[@]}"
-genfstab -U /mnt >>/mnt/etc/fstab
+  echo 40
+  echo "XXX"
+  echo "Installing Core Linux System & Drivers..."
+  echo "XXX"
+  pacstrap -K /mnt "${CORE_PKGS[@]}" >>"$LOG_FILE" 2>&1
 
-if [ "$NET_CHOICE" == "2" ] && [ -n "$STATIC_IP" ]; then
-  echo "Configuring NetworkManager Static IP Profile..."
-  mkdir -p /mnt/etc/NetworkManager/system-connections/
-  cat <<NMEOF >/mnt/etc/NetworkManager/system-connections/Wired_Static.nmconnection
+  # Generate fstab immediately after the core filesystem packages are installed
+  genfstab -U /mnt >>/mnt/etc/fstab
+
+  echo 48
+  echo "XXX"
+  echo "Downloading KDE Plasma & Wayland Compositor..."
+  echo "XXX"
+  pacstrap -K /mnt "${DESKTOP_PKGS[@]}" >>"$LOG_FILE" 2>&1
+
+  echo 58
+  echo "XXX"
+  echo "Installing ZypherOS Developer Tools..."
+  echo "XXX"
+  pacstrap -K /mnt "${TOOL_PKGS[@]}" >>"$LOG_FILE" 2>&1
+
+  if [ "$NET_CHOICE" == "2" ] && [ -n "$STATIC_IP" ]; then
+    mkdir -p /mnt/etc/NetworkManager/system-connections/
+    cat <<NMEOF >/mnt/etc/NetworkManager/system-connections/Wired_Static.nmconnection
 [connection]
 id=Zypher_Static
 type=ethernet
@@ -428,56 +463,38 @@ dns=$STATIC_DNS;
 [ipv6]
 method=auto
 NMEOF
-  chmod 600 /mnt/etc/NetworkManager/system-connections/Wired_Static.nmconnection
-fi
+    chmod 600 /mnt/etc/NetworkManager/system-connections/Wired_Static.nmconnection
+  fi
 
-echo "Staging system configurations and user dotfiles (/etc/skel)..."
-mkdir -p /mnt/etc/skel/.config/{nvim,discord}
+  # Prepare initramfs HOOKS logic for chroot
+  HOOK_STR="base udev autodetect modconf kms keyboard keymap consolefont block"
+  if [ "$ENCRYPT_CHOICE" == "true" ]; then HOOK_STR="$HOOK_STR encrypt"; fi
+  HOOK_STR="$HOOK_STR filesystems"
+  if [ "$SWAP_CHOICE" -gt 0 ]; then HOOK_STR="$HOOK_STR resume"; fi
+  HOOK_STR="$HOOK_STR fsck"
 
-cat <<'SKEL' >/mnt/etc/skel/.config/discord/settings.json
-{
-  "SKIP_HOST_UPDATE": true
-}
-SKEL
+  echo 65
+  echo "XXX"
+  echo "Configuring boot parameters and user accounts..."
+  echo "XXX"
 
-cat <<'SKEL' >/mnt/etc/skel/.config/kdeglobals
-[General]
-ColorScheme=BreezeDark
-Name=Breeze Dark
-TerminalApplication=ghostty
-SKEL
-
-cat <<'SKEL' >/mnt/etc/skel/.config/kcminputrc
-[Keyboard]
-NumLock=0
-SKEL
-
-echo "TERMINAL=ghostty" >>/mnt/etc/environment
-
-# Prepare initramfs HOOKS logic for chroot
-HOOK_STR="base udev autodetect modconf kms keyboard keymap consolefont block"
-if [ "$ENCRYPT_CHOICE" == "true" ]; then HOOK_STR="$HOOK_STR encrypt"; fi
-HOOK_STR="$HOOK_STR filesystems"
-if [ "$SWAP_CHOICE" -gt 0 ]; then HOOK_STR="$HOOK_STR resume"; fi
-HOOK_STR="$HOOK_STR fsck"
-
-echo "Generating internal configuration script..."
-cat <<EOF >/mnt/zypher_chroot.sh
+  # Generating internal configuration script
+  cat <<EOF >/mnt/zypher_chroot.sh
 #!/bin/bash
+set -e # CRITICAL FIX: Ensure inner chroot environment dies on failures
+
 echo "$HOSTNAME" > /etc/hostname
 ln -sf /usr/share/zoneinfo/$SELECTED_TIMEZONE /etc/localtime
 hwclock --systohc
 sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
-locale-gen
+locale-gen >> /var/log/zypheros-install.log 2>&1
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
-echo "Rebuilding Initramfs with new Storage/Encryption Hooks..."
+echo "Rebuilding Initramfs with new Storage/Encryption Hooks..." >> /var/log/zypheros-install.log
 sed -i "s/^HOOKS=.*/HOOKS=($HOOK_STR)/" /etc/mkinitcpio.conf
-mkinitcpio -P
+mkinitcpio -P >> /var/log/zypheros-install.log 2>&1
 
-echo "Configuring ZRAM"
 if [ "$ZRAM_SIZE" != "none" ]; then
-    echo "Configuring ZRAM for performance..."
     mkdir -p /etc/systemd/
     cat <<ZRAMEOF > /etc/systemd/zram-generator.conf
 [zram0]
@@ -485,7 +502,6 @@ zram-size = $ZRAM_SIZE
 ZRAMEOF
 fi
 
-echo "Pivoting system to ZypherOS Custom Repositories..."
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
 echo "NoExtract = etc/os-release etc/issue etc/issue.net" >> /etc/pacman.conf
@@ -499,133 +515,50 @@ if ! grep -q "^\[zypheros\]" /etc/pacman.conf; then
 
 [zypheros]
 SigLevel = Optional TrustAll
-Server = https://repo.zyphersystems.com/zypheros/\$arch
+# CRITICAL FIX: Removed the rogue backslash on $arch
+Server = https://repo.zyphersystems.com/zypheros/$arch
 REPOEOF
 fi
 
-pacman -Sy
-pacman -S --noconfirm --overwrite="*" zypheros-release zypheros-ghostty zypheros-fastfetch
-
-echo "Configuring SDDM Login Screen background and themes..."
-mkdir -p /etc/sddm.conf.d
-echo -e "[General]\nNumlock=on" > /etc/sddm.conf.d/numlock.conf
-echo -e "[Theme]\nCurrent=breeze" > /etc/sddm.conf.d/10-theme.conf
-
-mkdir -p /usr/share/sddm/themes/breeze
-cat <<'THEME' > /usr/share/sddm/themes/breeze/theme.conf.user
-[General]
-background=/usr/share/zypheros/branding/wallpaper.png
-THEME
-
-echo "Staging Personal User Branding Assets (.local)..."
-mkdir -p /etc/skel/.local/share/zypher/branding
-cp /usr/share/zypheros/branding/wallpaper.png /etc/skel/.local/share/zypher/branding/wallpaper.png
-cp /usr/share/zypheros/branding/icon.png /etc/skel/.local/share/zypher/branding/icon.png
-
-echo "Cloning LazyVim profile..."
-git clone https://github.com/zypher-systems/nvim-config.git /etc/skel/.config/nvim
-rm -rf /etc/skel/.config/nvim/.git
+pacman -Sy >> /var/log/zypheros-install.log 2>&1
+pacman -S --noconfirm --overwrite="*" zypheros-release zypheros-desktop-env >> /var/log/zypheros-install.log 2>&1
 
 useradd -m -c "$FULL_NAME" -G wheel -s /usr/bin/fish $USERNAME
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
-echo "Staging bulletproof hardcoded DBus script for first login..."
-mkdir -p /home/$USERNAME/.local/bin
-mkdir -p /home/$USERNAME/.config/autostart
-
-cat <<'BRANDSCRIPT' > /home/$USERNAME/.local/bin/zypher-branding.sh
-#!/bin/bash
-exec > "/home/ZYPHERUSER/zypher-branding.log" 2>&1
-echo "Waiting for Plasma DBus to initialize..."
-
-until qdbus6 org.kde.plasmashell /PlasmaShell >/dev/null 2>&1; do
-    sleep 2
-done
-
-echo "DBus found. Waiting 5s for Wayland desktop rendering..."
-sleep 5
-
-echo "Applying Wallpaper..."
-plasma-apply-wallpaperimage "/home/ZYPHERUSER/.local/share/zypher/branding/wallpaper.png"
-
-echo "Applying Launcher Icon..."
-qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
-    var p = panels();
-    for (var i=0; i<p.length; ++i) {
-        var w = p[i].widgets();
-        for (var j=0; j<w.length; ++j) {
-            if (w[j].type === 'org.kde.plasma.kickoff') {
-                w[j].currentConfigGroup = ['General'];
-                w[j].writeConfig('icon', '/home/ZYPHERUSER/.local/share/zypher/branding/icon.png');
-            }
-        }
-    }
-"
-
-echo "Success! Cleaning up autostart script and self-destructing..."
-rm -f "/home/ZYPHERUSER/.config/autostart/zypher-branding.desktop"
-rm -f "/home/ZYPHERUSER/zypher-branding.log"
-rm -f "/home/ZYPHERUSER/.local/bin/zypher-branding.sh"
-BRANDSCRIPT
-
-sed -i "s/ZYPHERUSER/$USERNAME/g" /home/$USERNAME/.local/bin/zypher-branding.sh
-chmod +x /home/$USERNAME/.local/bin/zypher-branding.sh
-
-cat <<'BRANDAUTO' > /home/$USERNAME/.config/autostart/zypher-branding.desktop
-[Desktop Entry]
-Type=Application
-Name=ZypherOS Branding Apply
-Exec=/home/ZYPHERUSER/.local/bin/zypher-branding.sh
-X-KDE-autostart-condition=
-BRANDAUTO
-
-sed -i "s/ZYPHERUSER/$USERNAME/g" /home/$USERNAME/.config/autostart/zypher-branding.desktop
-
-chown -R $USERNAME:$USERNAME /home/$USERNAME/.config
-chown -R $USERNAME:$USERNAME /home/$USERNAME/.local
-
-mkdir -p /var/lib/sddm/.config
-cp /etc/skel/.config/kdeglobals /var/lib/sddm/.config/kdeglobals
-chown -R sddm:sddm /var/lib/sddm/.config
-
-echo "Bootstrapping Neovim plugins for $USERNAME..."
 sudo -u "$USERNAME" nvim --headless "+Lazy! sync" +qa >/dev/null 2>&1 || true
 
-echo "Installing yay and AUR packages..."
 useradd -m -s /bin/bash builduser
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 chmod 440 /etc/sudoers.d/builduser
 
-sudo -u builduser git clone https://aur.archlinux.org/yay-bin.git /home/builduser/yay-bin
-sudo -u builduser bash -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm"
+sudo -u builduser git clone https://aur.archlinux.org/yay-bin.git /home/builduser/yay-bin >> /var/log/zypheros-install.log 2>&1
+sudo -u builduser bash -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm" >> /var/log/zypheros-install.log 2>&1
 
 rm /etc/sudoers.d/builduser
 userdel -r builduser
 
-systemctl enable NetworkManager
-systemctl enable sddm
-systemctl enable bluetooth
-if [ "$ENABLE_SSH" == "true" ]; then systemctl enable sshd; fi
+systemctl enable NetworkManager >> /var/log/zypheros-install.log 2>&1
+systemctl enable sddm >> /var/log/zypheros-install.log 2>&1
+systemctl enable bluetooth >> /var/log/zypheros-install.log 2>&1
+if [ "$ENABLE_SSH" == "true" ]; then systemctl enable sshd >> /var/log/zypheros-install.log 2>&1; fi
 
 if [ "$FS_CHOICE" == "btrfs" ]; then
-    echo "Initializing Snapper Architecture..."
     umount /.snapshots 2>/dev/null || true
     rm -rf /.snapshots
-    snapper -c root create-config /
+    snapper -c root create-config / >> /var/log/zypheros-install.log 2>&1
     btrfs subvolume delete /.snapshots 2>/dev/null || true
     mkdir /.snapshots
     mount -a
-    snapper -c home create-config /home
+    snapper -c home create-config /home >> /var/log/zypheros-install.log 2>&1
     chmod 750 /.snapshots
     chmod 750 /home/.snapshots
 fi
 
-echo "Deploying Bootloader..."
 mkdir -p /boot/EFI/BOOT
 cp /usr/share/limine/BOOTX64.EFI /boot/EFI/BOOT/
 cp /usr/share/limine/limine-bios.sys /boot/
 
-# Limine CMDLINE generation
 LIMINE_CMD=""
 if [ "$ENCRYPT_CHOICE" == "true" ]; then
     PHYS_UUID=\$(blkid -s UUID -o value $ROOT_PART)
@@ -659,27 +592,42 @@ echo "    module_path: boot():/initramfs-linux-lts.img" >> /boot/limine.conf
 echo "    cmdline: \$LIMINE_CMD" >> /boot/limine.conf
 
 if [ -d "/sys/firmware/efi" ]; then
-    efibootmgr --create --disk "$TARGET_DRIVE" --part 2 --loader '\EFI\BOOT\BOOTX64.EFI' --label "ZypherOS" --unicode
+    efibootmgr --create --disk "$TARGET_DRIVE" --part 2 --loader '\EFI\BOOT\BOOTX64.EFI' --label "ZypherOS" --unicode >> /var/log/zypheros-install.log 2>&1
 else
-    limine bios-install "$TARGET_DRIVE"
+    limine bios-install "$TARGET_DRIVE" >> /var/log/zypheros-install.log 2>&1
 fi
 EOF
 
-chmod +x /mnt/zypher_chroot.sh
-arch-chroot /mnt /zypher_chroot.sh
+  chmod +x /mnt/zypher_chroot.sh
+  arch-chroot /mnt /zypher_chroot.sh >>"$LOG_FILE" 2>&1
 
-# --- SAFE PASSWORD PIPING ---
-# This executes OUTSIDE the heredoc to prevent Bash from mangling special characters in passwords
-echo "Setting system passwords safely..."
-echo "$USERNAME:$PASSWORD" | arch-chroot /mnt chpasswd
-echo "root:$PASSWORD" | arch-chroot /mnt chpasswd
+  echo 90
+  echo "XXX"
+  echo "Securing user passwords..."
+  echo "XXX"
+  echo "$USERNAME:$PASSWORD" | arch-chroot /mnt chpasswd >>"$LOG_FILE" 2>&1
+  echo "root:$PASSWORD" | arch-chroot /mnt chpasswd >>"$LOG_FILE" 2>&1
 
-rm /mnt/zypher_chroot.sh
-umount -R /mnt
-swapoff -a 2>/dev/null || true
-cryptsetup close cryptroot 2>/dev/null || true
+  echo 95
+  echo "XXX"
+  echo "Cleaning up deployment environment..."
+  echo "XXX"
+  rm /mnt/zypher_chroot.sh
+  # Copy the installation log into the new system so the user can review it later
+  cp "$LOG_FILE" /mnt/var/log/zypheros-install.log
+  umount -R /mnt
+  swapoff -a 2>/dev/null || true
+  cryptsetup close cryptroot 2>/dev/null || true
 
-whiptail --backtitle "$BACKTITLE" --title "Installation Complete" --msgbox "ZypherOS has been successfully installed!\n\nPress Enter to exit the installer and reboot." 10 60
+  echo 100
+  echo "XXX"
+  echo "Deployment Complete!"
+  echo "XXX"
+  sleep 1
+
+} | whiptail --backtitle "$BACKTITLE" --title "System Deployment" --gauge "Initializing..." 8 70 0
+
+whiptail --backtitle "$BACKTITLE" --title "Installation Complete" --msgbox "ZypherOS has been successfully deployed to $TARGET_DRIVE!\n\nAn installation log has been saved to /var/log/zypheros-install.log on the new system.\n\nPress Enter to exit the installer and reboot." 12 60
 clear
 echo "Rebooting in 5 seconds..."
 sleep 5
