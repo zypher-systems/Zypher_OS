@@ -13,12 +13,17 @@ cryptsetup close cryptroot 2>/dev/null || true
 
 cleanup_on_fail() {
   if mountpoint -q /mnt; then
-    echo -e "\n[!] Installer interrupted or failed. Cleaning up mounted drives..."
+    echo -e "\n[!] Installer interrupted or failed. Rescuing logs..."
+    # THE BLACK BOX: Automatically rescues the inner log file before unmounting
+    cp /mnt/var/log/zypheros-install.log /tmp/chroot-crash.log 2>/dev/null || true
     umount -R /mnt/boot 2>/dev/null || true
     umount -R /mnt 2>/dev/null || true
     swapoff -a 2>/dev/null || true
     cryptsetup close cryptroot 2>/dev/null || true
-    echo "Cleanup complete. You can safely restart the installer by running ./install.sh"
+    echo "Cleanup complete."
+    echo "=========================================================="
+    echo "CRASH DETECTED. Check /tmp/chroot-crash.log for details."
+    echo "=========================================================="
   fi
 }
 trap cleanup_on_fail ERR INT TERM
@@ -255,7 +260,6 @@ else
   UCODE_IMG=""
 fi
 
-# THE FIX: Added || true so grep doesn't crash the script when run inside a VM
 GPU_VENDOR=$(lspci -vnn | grep -iE 'VGA|3D' | grep -iE 'NVIDIA|AMD|Intel' | head -n 1 || true)
 if echo "$GPU_VENDOR" | grep -iq "NVIDIA"; then
   DEFAULT="2"
@@ -485,7 +489,10 @@ set -e # CRITICAL FIX: Ensure inner chroot environment dies on failures
 
 echo "$HOSTNAME" > /etc/hostname
 ln -sf /usr/share/zoneinfo/$SELECTED_TIMEZONE /etc/localtime
-hwclock --systohc
+
+# THE VM FIX: Allow hardware clock sync to fail without crashing the whole script
+hwclock --systohc || true
+
 sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
 locale-gen >> /var/log/zypheros-install.log 2>&1
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
@@ -515,8 +522,7 @@ if ! grep -q "^\[zypheros\]" /etc/pacman.conf; then
 
 [zypheros]
 SigLevel = Optional TrustAll
-# CRITICAL FIX: Removed the rogue backslash on $arch
-Server = https://repo.zyphersystems.com/zypheros/$arch
+Server = https://repo.zyphersystems.com/zypheros/\$arch
 REPOEOF
 fi
 
@@ -538,10 +544,11 @@ sudo -u builduser bash -c "cd /home/builduser/yay-bin && makepkg -si --noconfirm
 rm /etc/sudoers.d/builduser
 userdel -r builduser
 
-systemctl enable NetworkManager >> /var/log/zypheros-install.log 2>&1
-systemctl enable sddm >> /var/log/zypheros-install.log 2>&1
-systemctl enable bluetooth >> /var/log/zypheros-install.log 2>&1
-if [ "$ENABLE_SSH" == "true" ]; then systemctl enable sshd >> /var/log/zypheros-install.log 2>&1; fi
+# THE DBUS FIX: Appended || true so systemctl DBus pings don't crash the script in a chroot
+systemctl enable NetworkManager >> /var/log/zypheros-install.log 2>&1 || true
+systemctl enable sddm >> /var/log/zypheros-install.log 2>&1 || true
+systemctl enable bluetooth >> /var/log/zypheros-install.log 2>&1 || true
+if [ "$ENABLE_SSH" == "true" ]; then systemctl enable sshd >> /var/log/zypheros-install.log 2>&1 || true; fi
 
 if [ "$FS_CHOICE" == "btrfs" ]; then
     umount /.snapshots 2>/dev/null || true
