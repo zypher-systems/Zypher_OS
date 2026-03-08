@@ -4,14 +4,14 @@ ZypherOS is a modern, hardware-aware Linux distribution built on top of Arch Lin
 
 Our goal is to eliminate the tedious boilerplate of setting up a highly optimized Linux workstation, providing a beautifully integrated, developer-first environment right out of the box.
 
-### 🎯 Project Goals & Philosophy
+### Project Goals & Philosophy
 
 1. **Hardware-Aware Automation:** The OS should intelligently adapt to the silicon it runs on—from dynamic CPU microcode injection to scaling compressed RAM swap, without forcing the user to memorize esoteric configuration flags.
 2. **Bulletproof by Default:** Mistakes happen. Updates break things. ZypherOS is built on a BTRFS filesystem with pre-configured Snapper snapshots, ensuring you can always roll back your system in seconds.
 3. **Developer-First Ergonomics:** We believe your terminal and editor should be first-class citizens. ZypherOS comes pre-configured with modern, high-performance CLI tools, the Fish shell, the Ghostty terminal emulator, and a fully integrated Neovim (LazyVim) environment.
 4. **Homelab Ready:** Whether deployed on bare metal, a dedicated gaming rig, or as a headless VM on a hypervisor, the OS is designed to be easily accessible and remotely manageable from the first boot.
 
-### ✨ Core Features
+### Core Features
 
 #### The Deployment Engine
 ZypherOS utilizes a custom, interactive TUI (Text User Interface) installer that handles the heavy lifting of system deployment:
@@ -31,7 +31,7 @@ ZypherOS ships with a curated selection of modern, rust-based, and high-performa
 * **Editor:** Neovim pre-configured with a custom LazyVim profile, `ripgrep`, `fd`, and `lazygit`.
 * **AUR Support:** Pre-compiled with `yay` for immediate access to the Arch User Repository.
 
-### 🚀 Getting Started
+### Getting Started
 
 *(Note: ZypherOS is currently in Alpha. Deployment on production data without backups is not recommended.)*
 
