@@ -514,8 +514,10 @@ ZRAMEOF
 fi
 
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
+# Inject NoExtract right under ParallelDownloads so it stays safely in the [options] section
+sed -i '/^ParallelDownloads = 10/a NoExtract = etc/os-release etc/issue etc/issue.net' /etc/pacman.conf
 sed -i '/^#\[multilib\]/,/^#Include = \/etc\/pacman\.d\/mirrorlist/ s/^#//' /etc/pacman.conf
-echo "NoExtract = etc/os-release etc/issue etc/issue.net" >> /etc/pacman.conf
+
 
 if ! head -n 5 /etc/pacman.d/mirrorlist | grep -q "repo.zyphersystems.com"; then
   sed -i '1i Server = https://repo.zyphersystems.com/mirror/\$repo/os/\$arch\n' /etc/pacman.d/mirrorlist
