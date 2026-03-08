@@ -307,8 +307,8 @@ LOG_FILE="/tmp/zypheros-install.log"
 >"$LOG_FILE" # Clear any previous logs
 
 {
-  echo 5
   echo "XXX"
+  echo 5
   echo "Preparing drives and clearing signatures..."
   echo "XXX"
 
@@ -347,8 +347,8 @@ LOG_FILE="/tmp/zypheros-install.log"
   if [ "$SWAP_CHOICE" -gt 0 ] && [ -n "$SWAP_PART" ]; then wipefs -af "$SWAP_PART" >>"$LOG_FILE" 2>&1 || true; fi
   wipefs -af "$ROOT_PART" >>"$LOG_FILE" 2>&1 || true
 
-  echo 15
   echo "XXX"
+  echo 15
   echo "Formatting filesystems ($FS_CHOICE)..."
   echo "XXX"
 
@@ -360,10 +360,11 @@ LOG_FILE="/tmp/zypheros-install.log"
   mkfs.vfat -F32 "$EFI_PART" >>"$LOG_FILE" 2>&1
 
   if [ "$ENCRYPT_CHOICE" == "true" ]; then
-    echo 20
     echo "XXX"
+    echo 20
     echo "Securing drive with LUKS2 Encryption..."
     echo "XXX"
+
     echo -n "$LUKS_PASS" | cryptsetup -q luksFormat "$ROOT_PART" - >>"$LOG_FILE" 2>&1
     echo -n "$LUKS_PASS" | cryptsetup open "$ROOT_PART" cryptroot - >>"$LOG_FILE" 2>&1
     ACTUAL_ROOT="/dev/mapper/cryptroot"
@@ -402,10 +403,11 @@ LOG_FILE="/tmp/zypheros-install.log"
 
   mount "$EFI_PART" /mnt/boot
 
-  echo 30
   echo "XXX"
+  echo 30
   echo "Optimizing download mirrors..."
   echo "XXX"
+
   reflector --country US --latest 5 --sort rate --save /etc/pacman.d/mirrorlist >>"$LOG_FILE" 2>&1
   pacman -Sy archlinux-keyring --noconfirm >>"$LOG_FILE" 2>&1
   pacman -Syy --noconfirm >>"$LOG_FILE" 2>&1
@@ -413,7 +415,6 @@ LOG_FILE="/tmp/zypheros-install.log"
   mkdir -p /mnt/etc
   echo "KEYMAP=us" >/mnt/etc/vconsole.conf
 
-  # We break the massive payload into logical chunks so the progress bar actually moves.
   CORE_PKGS=(
     base base-devel $KERNEL_PKG linux-lts linux-lts-headers linux-firmware sudo networkmanager
     $FS_PKG $CRYPT_PKG $GPU_PKG $UCODE_PKG limine efibootmgr mtools zram-generator openssh reflector
@@ -430,25 +431,28 @@ LOG_FILE="/tmp/zypheros-install.log"
     libreoffice-fresh pika-backup thunderbird ttf-meslo-nerd noto-fonts noto-fonts-emoji
   )
 
-  echo 40
   echo "XXX"
+  echo 40
   echo "Installing Core Linux System & Drivers..."
   echo "XXX"
+
   pacstrap -K /mnt "${CORE_PKGS[@]}" >>"$LOG_FILE" 2>&1
 
   # Generate fstab immediately after the core filesystem packages are installed
   genfstab -U /mnt >>/mnt/etc/fstab
 
-  echo 48
   echo "XXX"
+  echo 48
   echo "Downloading KDE Plasma & Wayland Compositor..."
   echo "XXX"
+
   pacstrap -K /mnt "${DESKTOP_PKGS[@]}" >>"$LOG_FILE" 2>&1
 
-  echo 58
   echo "XXX"
+  echo 58
   echo "Installing ZypherOS Developer Tools..."
   echo "XXX"
+
   pacstrap -K /mnt "${TOOL_PKGS[@]}" >>"$LOG_FILE" 2>&1
 
   if [ "$NET_CHOICE" == "2" ] && [ -n "$STATIC_IP" ]; then
@@ -477,8 +481,8 @@ NMEOF
   if [ "$SWAP_CHOICE" -gt 0 ]; then HOOK_STR="$HOOK_STR resume"; fi
   HOOK_STR="$HOOK_STR fsck"
 
-  echo 65
   echo "XXX"
+  echo 65
   echo "Configuring boot parameters and user accounts..."
   echo "XXX"
 
@@ -591,7 +595,7 @@ echo "    module_path: boot():/initramfs-$KERNEL_NAME.img" >> /boot/limine.conf
 echo "    cmdline: \$LIMINE_CMD" >> /boot/limine.conf
 
 echo "" >> /boot/limine.conf
-echo "/ZypherOS Failsafe (linux-lts)" >> /boot/limine.conf
+echo "/ZypherOS (linux-lts)" >> /boot/limine.conf
 echo "    protocol: linux" >> /boot/limine.conf
 echo "    kernel_path: boot():/vmlinuz-linux-lts" >> /boot/limine.conf
 if [ -n "$UCODE_IMG" ]; then echo "    module_path: boot():/$UCODE_IMG" >> /boot/limine.conf; fi
@@ -608,17 +612,19 @@ EOF
   chmod +x /mnt/zypher_chroot.sh
   arch-chroot /mnt /zypher_chroot.sh >>"$LOG_FILE" 2>&1
 
-  echo 90
   echo "XXX"
+  echo 90
   echo "Securing user passwords..."
   echo "XXX"
+
   echo "$USERNAME:$PASSWORD" | arch-chroot /mnt chpasswd >>"$LOG_FILE" 2>&1
   echo "root:$PASSWORD" | arch-chroot /mnt chpasswd >>"$LOG_FILE" 2>&1
 
-  echo 95
   echo "XXX"
+  echo 95
   echo "Cleaning up deployment environment..."
   echo "XXX"
+
   rm /mnt/zypher_chroot.sh
   # Copy the installation log into the new system so the user can review it later
   cp "$LOG_FILE" /mnt/var/log/zypheros-install.log
@@ -626,8 +632,8 @@ EOF
   swapoff -a 2>/dev/null || true
   cryptsetup close cryptroot 2>/dev/null || true
 
-  echo 100
   echo "XXX"
+  echo 100
   echo "Deployment Complete!"
   echo "XXX"
   sleep 1
