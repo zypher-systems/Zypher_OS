@@ -35,4 +35,4 @@ ZypherOS ships with a curated selection of modern, rust-based, and high-performa
 
 *(Note: ZypherOS is currently in Alpha. Deployment on production data without backups is not recommended.)*
 
-To install ZypherOS, download the latest ISO file from the tag section of release.
+To install ZypherOS, download the latest ISO file from the tag section of releases.
