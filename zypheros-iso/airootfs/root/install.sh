@@ -533,7 +533,7 @@ REPOEOF
 fi
 
 pacman -Sy >> /var/log/zypheros-install.log 2>&1
-pacman -S --noconfirm --overwrite="*" zypheros-release zypheros-desktop-env >> /var/log/zypheros-install.log 2>&1
+pacman -S --noconfirm --overwrite="*" zypheros-release zypheros-desktop-env zypheros-guide >> /var/log/zypheros-install.log 2>&1
 
 useradd -m -c "$FULL_NAME" -G wheel -s /usr/bin/fish $USERNAME
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
