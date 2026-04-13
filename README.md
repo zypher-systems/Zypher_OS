@@ -1,3 +1,5 @@
+# Attention, Zypher OS project is transitioning to a new build line code named Strat (Server) and Kinetic (Desktop).  Those repos are available below:
+
 # ZypherOS Project Documentation
 
 ZypherOS is a modern, hardware-aware Linux distribution built on top of Arch Linux. Designed for power users, developers, and homelab administrators, it bridges the gap between the bleeding-edge performance of Arch and the stability of a production-ready system. 
